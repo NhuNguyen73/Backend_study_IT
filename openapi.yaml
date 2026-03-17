@@ -1,0 +1,484 @@
+openapi: 3.0.3
+info:
+  title: Auth & RBAC API
+  version: 2.1.0
+
+servers:
+  - url: http://localhost:8080/api
+
+tags:
+  - name: Auth
+  - name: User
+  - name: Role
+  - name: Menu
+
+paths:
+
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Register new user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/SuccessMessage'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login (supports rememberMe for long-lived refresh token)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/TokenSuccess'
+        '401':
+          $ref: '#/components/responses/Error401'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh access token (rotation, old token revoked)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/TokenSuccess'
+        '401':
+          $ref: '#/components/responses/Error401'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout current session
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessMessage'
+
+  /auth/logout-all:
+    post:
+      tags: [Auth]
+      summary: Logout all sessions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessMessage'
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Get current user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/UserSuccess'
+
+  /auth/forgot-password:
+    post:
+      tags: [Auth]
+      summary: Send reset password email
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ForgotPasswordRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessMessage'
+
+  /auth/reset-password:
+    post:
+      tags: [Auth]
+      summary: Reset password
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResetPasswordRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessMessage'
+
+  /roles:
+    get:
+      tags: [Role]
+      summary: Get roles (pagination)
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+      responses:
+        '200':
+          $ref: '#/components/responses/RolePageSuccess'
+
+    post:
+      tags: [Role]
+      summary: Create role
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRoleRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/RoleSuccess'
+
+  /roles/{roleId}/permissions:
+    post:
+      tags: [Role]
+      summary: Assign permission to role
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RoleId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignPermissionRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessMessage'
+
+    delete:
+      tags: [Role]
+      summary: Remove permission from role
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/RoleId'
+        - name: permissionId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessMessage'
+
+  /users/{userId}/roles:
+    post:
+      tags: [User]
+      summary: Assign role to user
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AssignRoleRequest'
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessMessage'
+
+    delete:
+      tags: [User]
+      summary: Remove role from user
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+        - name: roleId
+          in: query
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          $ref: '#/components/responses/SuccessMessage'
+
+  /menus:
+    get:
+      tags: [Menu]
+      summary: Get menu tree by permissions
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          $ref: '#/components/responses/MenuSuccess'
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema:
+        type: integer
+        default: 0
+    Size:
+      name: size
+      in: query
+      schema:
+        type: integer
+        default: 10
+    UserId:
+      name: userId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+    RoleId:
+      name: roleId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+
+    SuccessMessage:
+      description: Success
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/MessageResponse'
+
+    TokenSuccess:
+      description: Token response
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/TokenResponse'
+
+    UserSuccess:
+      description: User info
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/UserInfo'
+
+    RoleSuccess:
+      description: Role
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Role'
+
+    RolePageSuccess:
+      description: Role list
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/RolePage'
+
+    MenuSuccess:
+      description: Menu tree
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/Menu'
+
+    Error401:
+      description: Unauthorized
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+
+    MessageResponse:
+      type: object
+      properties:
+        message:
+          type: string
+
+    ErrorResponse:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+
+    RegisterRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          minLength: 6
+        fullName:
+          type: string
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+        rememberMe:
+          type: boolean
+          default: false
+          description: If true, refresh token will have longer expiry
+
+    RefreshRequest:
+      type: object
+      required: [refreshToken]
+      properties:
+        refreshToken:
+          type: string
+
+    ForgotPasswordRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          format: email
+
+    ResetPasswordRequest:
+      type: object
+      required: [token, newPassword]
+      properties:
+        token:
+          type: string
+        newPassword:
+          type: string
+          minLength: 6
+
+    CreateRoleRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+
+    AssignRoleRequest:
+      type: object
+      required: [roleId]
+      properties:
+        roleId:
+          type: string
+          format: uuid
+
+    AssignPermissionRequest:
+      type: object
+      required: [permissionId]
+      properties:
+        permissionId:
+          type: string
+          format: uuid
+
+    UserInfo:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        fullName:
+          type: string
+        status:
+          type: string
+        emailVerified:
+          type: boolean
+        roles:
+          type: array
+          items:
+            type: string
+        permissions:
+          type: array
+          items:
+            type: string
+
+    TokenResponse:
+      type: object
+      properties:
+        accessToken:
+          type: string
+        refreshToken:
+          type: string
+        expiresIn:
+          type: integer
+          description: Access token expiry (seconds)
+        refreshTokenExpiresIn:
+          type: integer
+          description: Refresh token expiry (seconds)
+        user:
+          $ref: '#/components/schemas/UserInfo'
+
+    Role:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+
+    RolePage:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/Role'
+        page:
+          type: integer
+        size:
+          type: integer
+        total:
+          type: integer
+
+    Menu:
+      type: object
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        route:
+          type: string
+        children:
+          type: array
+          items:
+            $ref: '#/components/schemas/Menu'

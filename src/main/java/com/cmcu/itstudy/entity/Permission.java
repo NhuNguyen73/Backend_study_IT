@@ -1,18 +1,24 @@
 package com.cmcu.itstudy.entity;
 
-import java.time.LocalDateTime;
-import java.util.UUID;
-
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
-import jakarta.persistence.PrePersist;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+
+import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.UUID;
 
 @Getter
 @Setter
@@ -24,24 +30,24 @@ import lombok.Setter;
 public class Permission {
 
     @Id
-    @Column(name = "p_id", nullable = false, columnDefinition = "uniqueidentifier")
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    @Column(name = "id", columnDefinition = "uniqueidentifier")
     private UUID id;
 
-    @Column(name = "p_code", length = 100)
-    private String code;
-
-    @Column(name = "p_name", length = 255)
+    @Column(name = "name", nullable = false, length = 150, unique = true)
     private String name;
 
-    @Column(name = "p_description", columnDefinition = "text")
+    @Column(name = "description", length = 500)
     private String description;
 
-    @Column(name = "p_created_at", columnDefinition = "datetime2")
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
-    @PrePersist
-    public void prePersist() {
-        if (id == null) id = UUID.randomUUID();
-        if (createdAt == null) createdAt = LocalDateTime.now();
-    }
+    @Column(name = "updated_at", nullable = false)
+    private LocalDateTime updatedAt;
+
+    @JsonIgnore
+    @OneToMany(mappedBy = "permission", fetch = FetchType.LAZY)
+    private Set<RolePermission> rolePermissions = new HashSet<>();
 }
+

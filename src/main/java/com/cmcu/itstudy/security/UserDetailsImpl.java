@@ -1,26 +1,29 @@
 package com.cmcu.itstudy.security;
 
-import java.util.Collection;
-import java.util.Collections;
-
+import com.cmcu.itstudy.entity.User;
 import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-import com.cmcu.itstudy.entity.User;
+import java.util.Collection;
+
 
 public class UserDetailsImpl implements UserDetails {
 
     private final User user;
+    private final Collection<? extends GrantedAuthority> authorities;
 
-    public UserDetailsImpl(User user) {
+    public UserDetailsImpl(User user, Collection<? extends GrantedAuthority> authorities) {
         this.user = user;
+        this.authorities = authorities;
+    }
+
+    public User getUser() {
+        return user;
     }
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        // No roles for now, return empty list
-        return Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"));
+        return authorities;
     }
 
     @Override
@@ -40,7 +43,7 @@ public class UserDetailsImpl implements UserDetails {
 
     @Override
     public boolean isAccountNonLocked() {
-        return user.getLockUntil() == null || user.getLockUntil().isBefore(java.time.LocalDateTime.now());
+        return true;
     }
 
     @Override
@@ -50,11 +53,7 @@ public class UserDetailsImpl implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return user.getDeletedAt() == null && user.getEmailVerified() != null && user.getEmailVerified();
-    }
-
-    public User getUser() {
-        return user;
+        return "ACTIVE".equalsIgnoreCase(user.getStatus());
     }
 }
 

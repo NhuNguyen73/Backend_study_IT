@@ -1,22 +1,23 @@
 package com.cmcu.itstudy.entity;
 
-import java.time.LocalDateTime;
-import java.util.UUID;
-
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
-import jakarta.persistence.PrePersist;
-import jakarta.persistence.FetchType;
-import jakarta.persistence.Version;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+
+import java.time.LocalDateTime;
+import java.util.UUID;
 
 @Getter
 @Setter
@@ -28,33 +29,25 @@ import lombok.Setter;
 public class RefreshToken {
 
     @Id
-    @Column(name = "rt_id", nullable = false, columnDefinition = "uniqueidentifier")
+    @GeneratedValue(strategy = GenerationType.AUTO)
+    @Column(name = "id", columnDefinition = "uniqueidentifier")
     private UUID id;
 
-    @Version
-    @Column(name = "rt_version", nullable = false)
-    private Long version;
-
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "rt_u_id", nullable = false)
+    @JoinColumn(name = "user_id", nullable = false)
+    @JsonIgnore
     private User user;
 
-    @Column(name = "rt_token", nullable = false, length = 500)
+    @Column(name = "token", nullable = false, length = 512, unique = true)
     private String token;
 
-    @Column(name = "rt_is_revoked", nullable = false, columnDefinition = "bit")
+    @Column(name = "expiry_date", nullable = false)
+    private LocalDateTime expiryDate;
+
+    @Column(name = "revoked", nullable = false)
     private Boolean revoked;
 
-    @Column(name = "rt_expires_at", nullable = false, columnDefinition = "datetime2")
-    private LocalDateTime expiresAt;
-
-    @Column(name = "rt_created_at", nullable = false, columnDefinition = "datetime2")
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
-
-    @PrePersist
-    public void prePersist() {
-        if (id == null) id = UUID.randomUUID();
-        if (createdAt == null) createdAt = LocalDateTime.now();
-    }
 }
 

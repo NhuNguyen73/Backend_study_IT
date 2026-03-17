@@ -1,14 +1,31 @@
 package com.cmcu.itstudy.service.contract;
 
-import com.cmcu.itstudy.dto.request.LoginRequest;
-import com.cmcu.itstudy.dto.request.RegisterRequest;
-import com.cmcu.itstudy.dto.response.LoginResponse;
-import com.cmcu.itstudy.dto.response.RegisterResponse;
+import com.cmcu.itstudy.dto.auth.ForgotPasswordRequestDto;
+import com.cmcu.itstudy.dto.auth.LoginRequestDto;
+import com.cmcu.itstudy.dto.auth.RefreshRequestDto;
+import com.cmcu.itstudy.dto.auth.RegisterRequestDto;
+import com.cmcu.itstudy.dto.auth.ResetPasswordRequestDto;
+import com.cmcu.itstudy.dto.auth.TokenResponseDto;
+import com.cmcu.itstudy.dto.auth.UserInfoDto;
+import com.cmcu.itstudy.dto.common.MessageResponseDto;
+import com.cmcu.itstudy.entity.User;
 
 public interface AuthService {
 
-    RegisterResponse register(RegisterRequest request);
+    MessageResponseDto register(RegisterRequestDto request);
 
-    LoginResponse login(LoginRequest request);
+    TokenResponseDto login(LoginRequestDto request);
+
+    TokenResponseDto refreshToken(RefreshRequestDto request);
+
+    MessageResponseDto logout(String refreshToken);
+
+    MessageResponseDto logoutAll(User currentUser);
+
+    UserInfoDto getCurrentUser(User currentUser);
+
+    MessageResponseDto forgotPassword(ForgotPasswordRequestDto request);
+
+    MessageResponseDto resetPassword(ResetPasswordRequestDto request);
 }
 

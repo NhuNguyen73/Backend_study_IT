@@ -1,179 +1,312 @@
 package com.cmcu.itstudy.service.impl;
 
-import java.time.LocalDateTime;
-import java.util.UUID;
-
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import com.cmcu.itstudy.dto.request.LoginRequest;
-import com.cmcu.itstudy.dto.request.RegisterRequest;
-import com.cmcu.itstudy.dto.response.LoginResponse;
-import com.cmcu.itstudy.dto.response.RegisterResponse;
-import com.cmcu.itstudy.entity.PasswordReset;
+import com.cmcu.itstudy.dto.auth.ForgotPasswordRequestDto;
+import com.cmcu.itstudy.dto.auth.LoginRequestDto;
+import com.cmcu.itstudy.dto.auth.RefreshRequestDto;
+import com.cmcu.itstudy.dto.auth.RegisterRequestDto;
+import com.cmcu.itstudy.dto.auth.ResetPasswordRequestDto;
+import com.cmcu.itstudy.dto.auth.TokenResponseDto;
+import com.cmcu.itstudy.dto.auth.UserInfoDto;
+import com.cmcu.itstudy.dto.common.MessageResponseDto;
+import com.cmcu.itstudy.entity.PasswordResetToken;
+import com.cmcu.itstudy.entity.Permission;
 import com.cmcu.itstudy.entity.RefreshToken;
+import com.cmcu.itstudy.entity.Role;
+import com.cmcu.itstudy.entity.RolePermission;
 import com.cmcu.itstudy.entity.User;
-import com.cmcu.itstudy.enums.TokenType;
-import com.cmcu.itstudy.enums.UserStatus;
-import com.cmcu.itstudy.exception.AppException;
-import com.cmcu.itstudy.repository.PasswordResetRepository;
+import com.cmcu.itstudy.entity.UserRole;
+import com.cmcu.itstudy.mapper.UserMapper;
+import com.cmcu.itstudy.repository.PasswordResetTokenRepository;
 import com.cmcu.itstudy.repository.RefreshTokenRepository;
 import com.cmcu.itstudy.repository.UserRepository;
-import com.cmcu.itstudy.security.UserDetailsImpl;
-import com.cmcu.itstudy.service.JwtService;
 import com.cmcu.itstudy.service.base.BaseAuthService;
 import com.cmcu.itstudy.service.contract.AuthService;
+import com.cmcu.itstudy.service.contract.JwtService;
+import jakarta.transaction.Transactional;
+import org.springframework.stereotype.Service;
+
+import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class AuthServiceImpl extends BaseAuthService implements AuthService {
 
-    private static final int VERIFY_EMAIL_TOKEN_EXPIRY_HOURS = 24;
-    private static final int REFRESH_TOKEN_EXPIRY_DAYS = 7;
-
     private final UserRepository userRepository;
-    private final PasswordResetRepository passwordResetRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final JwtService jwtService;
-    private final AuthenticationManager authenticationManager;
 
     public AuthServiceImpl(
-            PasswordEncoder passwordEncoder,
             UserRepository userRepository,
-            PasswordResetRepository passwordResetRepository,
             RefreshTokenRepository refreshTokenRepository,
+            PasswordResetTokenRepository passwordResetTokenRepository,
             JwtService jwtService,
-            AuthenticationManager authenticationManager) {
+            org.springframework.security.crypto.password.PasswordEncoder passwordEncoder
+    ) {
         super(passwordEncoder);
         this.userRepository = userRepository;
-        this.passwordResetRepository = passwordResetRepository;
         this.refreshTokenRepository = refreshTokenRepository;
+        this.passwordResetTokenRepository = passwordResetTokenRepository;
         this.jwtService = jwtService;
-        this.authenticationManager = authenticationManager;
     }
 
-    // ================= REGISTER =================
     @Override
     @Transactional
-    public RegisterResponse register(RegisterRequest request) {
-
-        String email = normalizeEmail(request.getEmail());
-
-        validateEmailNotExists(email);
-        validatePassword(request.getPassword());
-
-        User user = createUser(email, request.getPassword(), request.getFullName());
-        user = userRepository.save(user); // ⚠️ đảm bảo entity managed
-
-        PasswordReset token = createVerifyEmailToken(user);
-        passwordResetRepository.save(token);
-
-        return buildRegisterResponse(user);
-    }
-
-    private void validateEmailNotExists(String email) {
-        if (userRepository.existsByEmailAndNotDeleted(email)) {
-            throw new AppException("Email already exists");
+    public MessageResponseDto register(RegisterRequestDto request) {
+        if (userRepository.existsByEmail(request.getEmail())) {
+            throw new IllegalArgumentException("Email already in use");
         }
-    }
 
-    private void validatePassword(String password) {
-        if (password == null || password.length() < 8) {
-            throw new AppException("Password must be at least 8 characters");
-        }
-    }
+        LocalDateTime now = LocalDateTime.now();
 
-    private String normalizeEmail(String email) {
-        if (email == null || email.trim().isEmpty()) {
-            throw new AppException("Email is required");
-        }
-        return email.trim().toLowerCase();
-    }
-
-    private User createUser(String email, String rawPassword, String fullName) {
-        return User.builder()
-                .id(UUID.randomUUID())
-                .email(email)
-                .password(encodePassword(rawPassword))
-                .fullName(fullName)
+        User user = User.builder()
+                .email(request.getEmail())
+                .password(encodePassword(request.getPassword()))
+                .fullName(request.getFullName())
+                .status("ACTIVE")
                 .emailVerified(false)
-                .status(UserStatus.ACTIVE)
-                .createdAt(LocalDateTime.now())
-                .build();
-    }
-
-    private PasswordReset createVerifyEmailToken(User user) {
-        LocalDateTime now = LocalDateTime.now();
-
-        return PasswordReset.builder()
-                .user(user)
-                .token(UUID.randomUUID().toString())
-                .type(TokenType.VERIFY_EMAIL)
-                .used(false)
-                .expiresAt(now.plusHours(VERIFY_EMAIL_TOKEN_EXPIRY_HOURS))
                 .createdAt(now)
+                .updatedAt(now)
+                .build();
+
+        userRepository.save(user);
+
+        return MessageResponseDto.builder()
+                .message("Registered successfully")
                 .build();
     }
 
-    private RegisterResponse buildRegisterResponse(User user) {
-        return new RegisterResponse(
-                user.getId(),
-                user.getEmail(),
-                user.getFullName(),
-                "Registration successful. Please verify your email."
-        );
-    }
-
-    // ================= LOGIN =================
     @Override
     @Transactional
-    public LoginResponse login(LoginRequest request) {
+    public TokenResponseDto login(LoginRequestDto request) {
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new IllegalArgumentException("Invalid credentials"));
 
-        String email = normalizeEmail(request.getEmail());
+        if (!matchesPassword(request.getPassword(), user.getPassword())) {
+            throw new IllegalArgumentException("Invalid credentials");
+        }
 
-        Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(email, request.getPassword())
+        List<Role> roles = extractRoles(user);
+        List<Permission> permissions = extractPermissions(roles);
+
+        String accessToken = jwtService.generateAccessToken(
+                user,
+                roles.stream().map(Role::getName).collect(Collectors.toList()),
+                permissions.stream().map(Permission::getName).collect(Collectors.toList())
         );
 
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        User user = userDetails.getUser();
+        String refreshTokenValue = jwtService.generateRefreshToken(user);
 
-        updateLastLoginAt(user);
-        userRepository.save(user); // ⚠️ đảm bảo update được persist
-
-        String accessToken = jwtService.generateAccessToken(user);
-        RefreshToken refreshToken = createAndSaveRefreshToken(user);
-
-        return buildLoginResponse(accessToken, refreshToken.getToken());
-    }
-
-    private void updateLastLoginAt(User user) {
-        user.setLastLoginAt(LocalDateTime.now());
-    }
-
-    private RefreshToken createAndSaveRefreshToken(User user) {
         LocalDateTime now = LocalDateTime.now();
+        LocalDateTime refreshExpiry = now.plusSeconds(jwtService.getRefreshTokenExpirySeconds());
 
         RefreshToken refreshToken = RefreshToken.builder()
                 .user(user)
-                .token(UUID.randomUUID().toString())
+                .token(refreshTokenValue)
+                .expiryDate(refreshExpiry)
                 .revoked(false)
-                .expiresAt(now.plusDays(REFRESH_TOKEN_EXPIRY_DAYS))
                 .createdAt(now)
                 .build();
 
-        return refreshTokenRepository.save(refreshToken);
+        refreshTokenRepository.save(refreshToken);
+
+        UserInfoDto userInfoDto = UserMapper.toUserInfoDto(user, roles, permissions);
+
+        return TokenResponseDto.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshTokenValue)
+                .expiresIn(jwtService.getAccessTokenExpirySeconds())
+                .refreshTokenExpiresIn(jwtService.getRefreshTokenExpirySeconds())
+                .user(userInfoDto)
+                .build();
     }
 
-    private LoginResponse buildLoginResponse(String accessToken, String refreshToken) {
-        return new LoginResponse(
-                accessToken,
-                refreshToken,
-                "Bearer",
-                jwtService.getAccessTokenExpiration()
+    @Override
+    @Transactional
+    public TokenResponseDto refreshToken(RefreshRequestDto request) {
+        RefreshToken storedToken = refreshTokenRepository.findByToken(request.getRefreshToken())
+                .orElseThrow(() -> new IllegalArgumentException("Invalid refresh token"));
+
+        if (Boolean.TRUE.equals(storedToken.getRevoked())) {
+            throw new IllegalArgumentException("Refresh token revoked");
+        }
+
+        if (storedToken.getExpiryDate().isBefore(LocalDateTime.now())) {
+            throw new IllegalArgumentException("Refresh token expired");
+        }
+
+        storedToken.setRevoked(true);
+        refreshTokenRepository.save(storedToken);
+
+        User user = storedToken.getUser();
+
+        List<Role> roles = extractRoles(user);
+        List<Permission> permissions = extractPermissions(roles);
+
+        String newAccessToken = jwtService.generateAccessToken(
+                user,
+                roles.stream().map(Role::getName).collect(Collectors.toList()),
+                permissions.stream().map(Permission::getName).collect(Collectors.toList())
         );
+
+        String newRefreshTokenValue = jwtService.generateRefreshToken(user);
+
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime refreshExpiry = now.plusSeconds(jwtService.getRefreshTokenExpirySeconds());
+
+        RefreshToken newRefreshToken = RefreshToken.builder()
+                .user(user)
+                .token(newRefreshTokenValue)
+                .expiryDate(refreshExpiry)
+                .revoked(false)
+                .createdAt(now)
+                .build();
+
+        refreshTokenRepository.save(newRefreshToken);
+
+        UserInfoDto userInfoDto = UserMapper.toUserInfoDto(user, roles, permissions);
+
+        return TokenResponseDto.builder()
+                .accessToken(newAccessToken)
+                .refreshToken(newRefreshTokenValue)
+                .expiresIn(jwtService.getAccessTokenExpirySeconds())
+                .refreshTokenExpiresIn(jwtService.getRefreshTokenExpirySeconds())
+                .user(userInfoDto)
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public MessageResponseDto logout(String refreshTokenValue) {
+        Optional<RefreshToken> optional = refreshTokenRepository.findByToken(refreshTokenValue);
+        optional.ifPresent(token -> {
+            token.setRevoked(true);
+            refreshTokenRepository.save(token);
+        });
+
+        return MessageResponseDto.builder()
+                .message("Logged out")
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public MessageResponseDto logoutAll(User currentUser) {
+        List<RefreshToken> tokens = refreshTokenRepository.findByUser(currentUser);
+        for (RefreshToken token : tokens) {
+            token.setRevoked(true);
+        }
+        refreshTokenRepository.saveAll(tokens);
+
+        return MessageResponseDto.builder()
+                .message("Logged out from all sessions")
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public UserInfoDto getCurrentUser(User currentUser) {
+        List<Role> roles = extractRoles(currentUser);
+        List<Permission> permissions = extractPermissions(roles);
+        return UserMapper.toUserInfoDto(currentUser, roles, permissions);
+    }
+
+    @Override
+    @Transactional
+    public MessageResponseDto forgotPassword(ForgotPasswordRequestDto request) {
+        if (request.getEmail() == null || request.getEmail().isBlank()) {
+            // Spec allows email to be optional, but service requires it to send email.
+            return MessageResponseDto.builder()
+                    .message("If that email exists, a reset link has been sent")
+                    .build();
+        }
+
+        Optional<User> optionalUser = userRepository.findByEmail(request.getEmail());
+        if (optionalUser.isEmpty()) {
+            return MessageResponseDto.builder()
+                    .message("If that email exists, a reset link has been sent")
+                    .build();
+        }
+
+        User user = optionalUser.get();
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime expiry = now.plusHours(1);
+
+        String tokenValue = UUID.randomUUID().toString();
+
+        PasswordResetToken token = PasswordResetToken.builder()
+                .user(user)
+                .token(tokenValue)
+                .expiryDate(expiry)
+                .used(false)
+                .createdAt(now)
+                .build();
+
+        passwordResetTokenRepository.save(token);
+
+        // Email sending should be implemented in separate infrastructure/service layer.
+
+        return MessageResponseDto.builder()
+                .message("If that email exists, a reset link has been sent")
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public MessageResponseDto resetPassword(ResetPasswordRequestDto request) {
+        PasswordResetToken resetToken = passwordResetTokenRepository.findByToken(request.getToken())
+                .orElseThrow(() -> new IllegalArgumentException("Invalid reset token"));
+
+        if (Boolean.TRUE.equals(resetToken.getUsed())) {
+            throw new IllegalArgumentException("Reset token already used");
+        }
+
+        if (resetToken.getExpiryDate().isBefore(LocalDateTime.now())) {
+            throw new IllegalArgumentException("Reset token expired");
+        }
+
+        User user = resetToken.getUser();
+        user.setPassword(encodePassword(request.getNewPassword()));
+        user.setUpdatedAt(LocalDateTime.now());
+        userRepository.save(user);
+
+        resetToken.setUsed(true);
+        passwordResetTokenRepository.save(resetToken);
+
+        return MessageResponseDto.builder()
+                .message("Password has been reset")
+                .build();
+    }
+
+    private List<Role> extractRoles(User user) {
+        Set<Role> roles = new HashSet<>();
+        if (user.getUserRoles() != null) {
+            for (UserRole userRole : user.getUserRoles()) {
+                if (userRole.getRole() != null) {
+                    roles.add(userRole.getRole());
+                }
+            }
+        }
+        return roles.stream().toList();
+    }
+
+    private List<Permission> extractPermissions(List<Role> roles) {
+        Set<Permission> permissions = new HashSet<>();
+        for (Role role : roles) {
+            if (role.getRolePermissions() != null) {
+                for (RolePermission rp : role.getRolePermissions()) {
+                    if (rp.getPermission() != null) {
+                        permissions.add(rp.getPermission());
+                    }
+                }
+            }
+        }
+        return permissions.stream().toList();
     }
 }
+
