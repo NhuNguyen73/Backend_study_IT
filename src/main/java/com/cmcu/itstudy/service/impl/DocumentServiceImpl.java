@@ -239,10 +239,16 @@ public class DocumentServiceImpl implements DocumentService {
                         .map(UUID::fromString)
                         .collect(Collectors.toList());
                 if (!tagIds.isEmpty()) {
-                    Join<Document, DocumentTag> join = root.join("documentTags", JoinType.INNER);
-                    predicates.add(join.get("tagId").in(tagIds));
-                    query.groupBy(root.get("id"));
-                    query.having(cb.equal(cb.countDistinct(join.get("tagId")), tagIds.size()));
+                    // Use subquery for "document contains ALL selected tags" to avoid groupBy/having
+                    // issues in Spring Data count query (pagination).
+                    var sub = query.subquery(UUID.class);
+                    var dt = sub.from(DocumentTag.class);
+                    sub.select(dt.get("documentId"));
+                    sub.where(dt.get("tagId").in(tagIds));
+                    sub.groupBy(dt.get("documentId"));
+                    sub.having(cb.equal(cb.countDistinct(dt.get("tagId")), (long) tagIds.size()));
+
+                    predicates.add(root.get("id").in(sub));
                 }
             }
 
