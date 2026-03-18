@@ -1,0 +1,7 @@
+package com.cmcu.itstudy.repository;
+
+import com.cmcu.itstudy.entity.SystemLog;
+import org.springframework.data.jpa.repository.JpaRepository;
+
+public interface SystemLogRepository extends JpaRepository<SystemLog, Long> {
+}

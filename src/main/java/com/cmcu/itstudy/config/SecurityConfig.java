@@ -56,7 +56,13 @@ public class SecurityConfig {
                                 "/api/auth/register",
                                 "/api/auth/refresh",
                                 "/api/auth/forgot-password",
-                                "/api/auth/reset-password"
+                                "/api/auth/reset-password",
+                                "/api/homepage/**",
+                                "/api/documents",
+                                "/api/documents/*",
+                                "/api/documents/*/view",
+                                "/api/categories",
+                                "/api/tags/popular"
                         ).permitAll()
                         .anyRequest().authenticated()
                 )
