@@ -53,6 +53,7 @@ public class GlobalExceptionHandler {
         HttpStatus status;
 
         if (message != null && (message.contains("Invalid credentials")
+                || message.contains("Invalid email or password")
                 || message.contains("Refresh token")
                 || message.contains("reset token"))) {
             status = HttpStatus.UNAUTHORIZED;

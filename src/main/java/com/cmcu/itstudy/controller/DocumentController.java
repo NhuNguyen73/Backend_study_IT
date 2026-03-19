@@ -2,7 +2,6 @@ package com.cmcu.itstudy.controller;
 
 import com.cmcu.itstudy.dto.common.ApiResponse;
 import com.cmcu.itstudy.dto.common.MessageResponseDto;
-import com.cmcu.itstudy.dto.document.DocumentCardResponseDto;
 import com.cmcu.itstudy.dto.document.DocumentDetailResponseDto;
 import com.cmcu.itstudy.dto.document.DocumentListRequestDto;
 import com.cmcu.itstudy.dto.document.PagedResponseDocumentCardDto;
@@ -32,6 +31,8 @@ public class DocumentController {
         this.documentService = documentService;
     }
 
+    private static final int KEYWORD_MAX_LENGTH = 50;
+
     @GetMapping("/documents")
     public ResponseEntity<ApiResponse<PagedResponseDocumentCardDto>> getDocuments(
             @RequestParam(name = "keyword", required = false) String keyword,
@@ -42,8 +43,12 @@ public class DocumentController {
             @RequestParam(name = "size", defaultValue = "10") @Min(1) @Max(100) Integer size,
             @AuthenticationPrincipal UserDetailsImpl currentUser
     ) {
+        String normalizedKeyword = (keyword != null) ? keyword.trim() : null;
+        if (normalizedKeyword != null && normalizedKeyword.length() > KEYWORD_MAX_LENGTH) {
+            throw new IllegalArgumentException("Từ khóa tìm kiếm tối đa " + KEYWORD_MAX_LENGTH + " ký tự.");
+        }
         DocumentListRequestDto request = DocumentListRequestDto.builder()
-                .keyword(keyword)
+                .keyword(normalizedKeyword)
                 .categoryId(categoryId)
                 .tagIds(tagIds)
                 .sort(sort)

@@ -85,10 +85,10 @@ public class AuthServiceImpl extends BaseAuthService implements AuthService {
     @Transactional
     public TokenResponseDto login(LoginRequestDto request) {
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new IllegalArgumentException("Invalid credentials"));
+                .orElseThrow(() -> new IllegalArgumentException("Invalid email or password"));
 
         if (!matchesPassword(request.getPassword(), user.getPassword())) {
-            throw new IllegalArgumentException("Invalid credentials");
+            throw new IllegalArgumentException("Invalid email or password");
         }
 
         List<Role> roles = extractRoles(user);
