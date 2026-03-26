@@ -160,21 +160,7 @@ public UserDto updateUser(...) {
 
 ---
 
-### 8. Quy ước đặt tên permission (gợi ý)
-
-Để hệ thống dễ scale và dễ đọc:
-
-- Dùng pattern: `RESOURCE_ACTION` (VIẾT HOA, snake_case)
-  - Ví dụ:
-    - `USER_READ`, `USER_CREATE`, `USER_UPDATE`, `USER_DELETE`
-    - `ROLE_MANAGE`
-    - `MENU_READ`
-    - `DOCUMENT_APPROVE`
-- Tránh dùng dấu cách hoặc ký tự đặc biệt trong `name`.
-
----
-
-### 9. Tóm tắt luồng RBAC cơ bản
+### 8. Tóm tắt luồng RBAC cơ bản
 
 1. User đăng nhập → `AuthService.login` sinh access token (JWT) + refresh token.
 2. Mỗi request gửi kèm `Authorization: Bearer <access-token>`.

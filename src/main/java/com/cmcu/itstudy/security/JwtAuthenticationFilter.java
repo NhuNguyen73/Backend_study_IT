@@ -1,7 +1,5 @@
 package com.cmcu.itstudy.security;
 
-import com.cmcu.itstudy.entity.User;
-import com.cmcu.itstudy.repository.UserRepository;
 import com.cmcu.itstudy.service.contract.JwtService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -49,7 +47,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 if (username != null) {
                     UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
-                    if (jwtService.isTokenValid(token, ((UserDetailsImpl) userDetails).getUser())) {
+                    if (userDetails instanceof UserDetailsImpl userDetailsImpl
+                            && userDetails.isEnabled()
+                            && jwtService.isTokenValid(token, userDetailsImpl.getUser())) {
                         UsernamePasswordAuthenticationToken authentication =
                                 new UsernamePasswordAuthenticationToken(
                                         userDetails,

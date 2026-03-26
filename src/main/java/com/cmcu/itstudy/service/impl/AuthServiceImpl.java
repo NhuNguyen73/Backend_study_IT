@@ -18,7 +18,9 @@ import com.cmcu.itstudy.entity.UserRole;
 import com.cmcu.itstudy.mapper.UserMapper;
 import com.cmcu.itstudy.repository.PasswordResetTokenRepository;
 import com.cmcu.itstudy.repository.RefreshTokenRepository;
+import com.cmcu.itstudy.repository.RoleRepository;
 import com.cmcu.itstudy.repository.UserRepository;
+import com.cmcu.itstudy.repository.UserRoleRepository;
 import com.cmcu.itstudy.service.base.BaseAuthService;
 import com.cmcu.itstudy.service.contract.AuthService;
 import com.cmcu.itstudy.service.contract.JwtService;
@@ -36,13 +38,19 @@ import java.util.stream.Collectors;
 @Service
 public class AuthServiceImpl extends BaseAuthService implements AuthService {
 
+    private static final String ROLE_USER = "USER";
+
     private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
+    private final UserRoleRepository userRoleRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final JwtService jwtService;
 
     public AuthServiceImpl(
             UserRepository userRepository,
+            RoleRepository roleRepository,
+            UserRoleRepository userRoleRepository,
             RefreshTokenRepository refreshTokenRepository,
             PasswordResetTokenRepository passwordResetTokenRepository,
             JwtService jwtService,
@@ -50,6 +58,8 @@ public class AuthServiceImpl extends BaseAuthService implements AuthService {
     ) {
         super(passwordEncoder);
         this.userRepository = userRepository;
+        this.roleRepository = roleRepository;
+        this.userRoleRepository = userRoleRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.passwordResetTokenRepository = passwordResetTokenRepository;
         this.jwtService = jwtService;
@@ -74,7 +84,20 @@ public class AuthServiceImpl extends BaseAuthService implements AuthService {
                 .updatedAt(now)
                 .build();
 
-        userRepository.save(user);
+        user = userRepository.save(user);
+
+        Role defaultRole = roleRepository.findByName(ROLE_USER)
+                .orElseThrow(() -> new IllegalArgumentException("Default role USER not found"));
+
+        UserRole.UserRoleId userRoleId = new UserRole.UserRoleId(user.getId(), defaultRole.getId());
+        if (!userRoleRepository.existsById(userRoleId)) {
+            UserRole userRole = UserRole.builder()
+                    .userId(user.getId())
+                    .roleId(defaultRole.getId())
+                    .createdAt(now)
+                    .build();
+            userRoleRepository.save(userRole);
+        }
 
         return MessageResponseDto.builder()
                 .message("Registered successfully")
