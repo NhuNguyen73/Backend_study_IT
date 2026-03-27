@@ -1,6 +1,7 @@
 package com.cmcu.itstudy.entity;
 
 import com.fasterxml.jackson.annotation.JsonBackReference;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -20,7 +21,9 @@ import lombok.Setter;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Getter
@@ -50,6 +53,7 @@ public class Menu {
 
     @OneToMany(mappedBy = "parent", fetch = FetchType.LAZY)
     @JsonManagedReference
+    @Builder.Default
     private List<Menu> children = new ArrayList<>();
 
     @Column(name = "display_order", nullable = false)
@@ -60,5 +64,10 @@ public class Menu {
 
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
+
+    @JsonIgnore
+    @OneToMany(mappedBy = "menu", fetch = FetchType.LAZY)
+    @Builder.Default
+    private Set<MenuPermission> menuPermissions = new HashSet<>();
 }
 

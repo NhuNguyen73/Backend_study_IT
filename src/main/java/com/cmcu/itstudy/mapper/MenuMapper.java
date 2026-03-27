@@ -31,5 +31,18 @@ public final class MenuMapper {
                 .children(childDtos)
                 .build();
     }
+
+    public static MenuDto toMenuDtoWithoutChildren(Menu menu) {
+        if (menu == null) {
+            return null;
+        }
+
+        return MenuDto.builder()
+                .id(menu.getId() != null ? menu.getId().toString() : null)
+                .name(menu.getName())
+                .route(menu.getRoute())
+                .children(null)
+                .build();
+    }
 }
 
