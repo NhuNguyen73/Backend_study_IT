@@ -1,5 +1,6 @@
 package com.cmcu.itstudy.dto.admin;
 
+import com.cmcu.itstudy.enums.ContributorRequestStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -20,7 +21,8 @@ public class AdminContributorRequestDto {
     private String portfolioLink;
     private String experience;
     private LocalDateTime createdAt;
-    private String status; // Trạng thái: PENDING, APPROVED, REJECTED
+    private ContributorRequestStatus status; // Trạng thái: PENDING, APPROVED, REJECTED
     private List<AdminContributorCertificateDto> certificates;
     private String avatarUrl; // URL avatar của người dùng
+    private String rejectionReason; // Lý do từ chối hoặc yêu cầu bổ sung thông tin
 }

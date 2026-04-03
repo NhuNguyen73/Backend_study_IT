@@ -19,6 +19,7 @@ import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Getter
 @Setter
@@ -59,6 +60,14 @@ public class User {
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     private Set<UserRole> userRoles = new HashSet<>();
 
+    public Set<Role> getRoles() {
+        return userRoles.stream().map(UserRole::getRole).collect(Collectors.toSet());
+    }
+
+    public void setRoles(Set<Role> roles) {
+        this.userRoles.clear();
+        roles.forEach(role -> this.userRoles.add(UserRole.builder().user(this).role(role).build()));
+    }
     @JsonIgnore
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     private Set<RefreshToken> refreshTokens = new HashSet<>();

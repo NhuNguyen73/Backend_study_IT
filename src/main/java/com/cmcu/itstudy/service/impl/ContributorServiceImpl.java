@@ -5,6 +5,7 @@ import com.cmcu.itstudy.dto.contributor.ContributorStatusDto;
 import com.cmcu.itstudy.entity.ContributorCertificate;
 import com.cmcu.itstudy.entity.ContributorRequest;
 import com.cmcu.itstudy.entity.User;
+import com.cmcu.itstudy.enums.ContributorRequestStatus;
 import com.cmcu.itstudy.repository.ContributorRequestRepository;
 import com.cmcu.itstudy.repository.UserRepository;
 import com.cmcu.itstudy.service.contract.ContributorService;
@@ -34,7 +35,7 @@ public class ContributorServiceImpl implements ContributorService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        if (contributorRequestRepository.existsByUserAndStatus(user, "PENDING")) {
+        if (contributorRequestRepository.existsByUserAndStatus(user, ContributorRequestStatus.PENDING)) {
             throw new RuntimeException("Bạn đã có một yêu cầu đang chờ duyệt.");
         }
 
@@ -42,10 +43,11 @@ public class ContributorServiceImpl implements ContributorService {
                 .user(user)
                 .portfolioLink(request.getPortfolioLink())
                 .experience(request.getExperience())
-                .status("PENDING")
+                .status(ContributorRequestStatus.PENDING)
                 .createdAt(LocalDateTime.now())
                 .updatedAt(LocalDateTime.now())
                 .build();
+
 
         if (!request.getCertificates().isEmpty()) {
             contributorRequest.setCertificateName(request.getCertificates().get(0).getCertificateName());

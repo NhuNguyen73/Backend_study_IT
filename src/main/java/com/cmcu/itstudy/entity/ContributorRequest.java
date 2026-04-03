@@ -1,8 +1,11 @@
 package com.cmcu.itstudy.entity;
 
+import com.cmcu.itstudy.enums.ContributorRequestStatus;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -46,8 +49,9 @@ public class ContributorRequest {
     @Column(name = "experience", nullable = false, length = 1000)
     private String experience;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 50)
-    private String status;
+    private ContributorRequestStatus status;
 
     @Column(name = "certificate_name")
     private String certificateName;
