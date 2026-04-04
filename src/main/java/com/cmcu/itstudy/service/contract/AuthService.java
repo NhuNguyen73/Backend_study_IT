@@ -28,6 +28,6 @@ public interface AuthService {
 
     MessageResponseDto resetPassword(ResetPasswordRequestDto request);
 
-    TokenResponseDto loginWithOAuth(String email);
+    TokenResponseDto loginWithOAuth(String email, String name, String avatar);
 }
 

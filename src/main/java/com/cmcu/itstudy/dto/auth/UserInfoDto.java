@@ -18,6 +18,7 @@ public class UserInfoDto {
     private String id;
     private String email;
     private String fullName;
+    private String avatar;
     private String status;
     private Boolean emailVerified;
     private List<String> roles;

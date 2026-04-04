@@ -250,7 +250,7 @@ public class AuthServiceImpl extends BaseAuthService implements AuthService {
                 .orElseThrow(() -> new IllegalArgumentException("User not found"));
         List<Role> roles = extractRoles(userWithRoles);
         List<Permission> permissions = extractPermissions(roles);
-        return UserMapper.toUserInfoDto(currentUser, roles, permissions);
+        return UserMapper.toUserInfoDto(userWithRoles, roles, permissions);
     }
 
     @Override
@@ -347,20 +347,23 @@ public class AuthServiceImpl extends BaseAuthService implements AuthService {
     }
     @Override
     @Transactional
-    public TokenResponseDto loginWithOAuth(String email) {
+    public TokenResponseDto loginWithOAuth(String email, String name, String avatar) {
 
         LocalDateTime now = LocalDateTime.now();
 
-        // 🔍 tìm user
+        String resolvedName = (name != null && !name.isBlank()) ? name.trim() : null;
+        String resolvedAvatar = (avatar != null && !avatar.isBlank()) ? avatar.trim() : null;
+
         User user = userRepository.findByEmailWithRoles(email).orElse(null);
 
-        // 👉 nếu chưa có → tạo mới
         if (user == null) {
+            String fullName = resolvedName != null ? resolvedName : email;
 
             user = User.builder()
                     .email(email)
-                    .password(encodePassword("oauth2user")) // password fake
-                    .fullName(email)
+                    .password(encodePassword("OAUTH2_USER_" + UUID.randomUUID()))
+                    .fullName(fullName)
+                    .avatar(resolvedAvatar)
                     .status("ACTIVE")
                     .emailVerified(true)
                     .createdAt(now)
@@ -369,7 +372,6 @@ public class AuthServiceImpl extends BaseAuthService implements AuthService {
 
             user = userRepository.save(user);
 
-            // 👉 gán role USER (giống register)
             Role defaultRole = roleRepository.findByName(ROLE_USER)
                     .orElseThrow(() -> new IllegalArgumentException("Default role USER not found"));
 
@@ -381,11 +383,23 @@ public class AuthServiceImpl extends BaseAuthService implements AuthService {
 
             userRoleRepository.save(userRole);
 
-            // load lại để có roles
             user = userRepository.findByEmailWithRoles(email).orElseThrow();
+        } else {
+            boolean changed = false;
+            if ((user.getFullName() == null || user.getFullName().isBlank()) && resolvedName != null) {
+                user.setFullName(resolvedName);
+                changed = true;
+            }
+            if ((user.getAvatar() == null || user.getAvatar().isBlank()) && resolvedAvatar != null) {
+                user.setAvatar(resolvedAvatar);
+                changed = true;
+            }
+            if (changed) {
+                user.setUpdatedAt(now);
+                userRepository.save(user);
+                user = userRepository.findByEmailWithRoles(email).orElseThrow();
+            }
         }
-
-        // 🔥 giống login()
         List<Role> roles = extractRoles(user);
 
         List<String> roleNames = roles.stream()

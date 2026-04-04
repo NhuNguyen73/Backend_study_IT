@@ -32,6 +32,7 @@ public final class UserMapper {
                 .id(user.getId() != null ? user.getId().toString() : null)
                 .email(user.getEmail())
                 .fullName(user.getFullName())
+                .avatar(user.getAvatar())
                 .status(user.getStatus())
                 .emailVerified(user.getEmailVerified())
                 .roles(roleNames)

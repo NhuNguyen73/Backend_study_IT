@@ -44,6 +44,9 @@ public class User {
     @Column(name = "full_name", length = 255)
     private String fullName;
 
+    @Column(name = "avatar", length = 2048)
+    private String avatar;
+
     @Column(name = "status", nullable = false, length = 50)
     private String status;
 
