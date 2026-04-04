@@ -27,5 +27,7 @@ public interface AuthService {
     MessageResponseDto forgotPassword(ForgotPasswordRequestDto request);
 
     MessageResponseDto resetPassword(ResetPasswordRequestDto request);
+
+    TokenResponseDto loginWithOAuth(String email);
 }
 
