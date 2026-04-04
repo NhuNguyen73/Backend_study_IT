@@ -107,7 +107,7 @@ public class AuthServiceImpl extends BaseAuthService implements AuthService {
     @Override
     @Transactional
     public TokenResponseDto login(LoginRequestDto request) {
-        User user = userRepository.findByEmail(request.getEmail())
+        User user = userRepository.findByEmailWithRoles(request.getEmail())
                 .orElseThrow(() -> new IllegalArgumentException("Invalid email or password"));
 
         if (!matchesPassword(request.getPassword(), user.getPassword())) {
@@ -115,11 +115,15 @@ public class AuthServiceImpl extends BaseAuthService implements AuthService {
         }
 
         List<Role> roles = extractRoles(user);
+        // Lọc các vai trò mong muốn ('ADMIN', 'CONTRIBUTOR') để đưa vào token
+        List<String> authorizedRoleNames = roles.stream()
+    .map(Role::getName)
+    .collect(Collectors.toList());
         List<Permission> permissions = extractPermissions(roles);
 
         String accessToken = jwtService.generateAccessToken(
                 user,
-                roles.stream().map(Role::getName).collect(Collectors.toList()),
+                authorizedRoleNames,
                 permissions.stream().map(Permission::getName).collect(Collectors.toList())
         );
 
@@ -166,14 +170,19 @@ public class AuthServiceImpl extends BaseAuthService implements AuthService {
         storedToken.setRevoked(true);
         refreshTokenRepository.save(storedToken);
 
-        User user = storedToken.getUser();
+        User user = userRepository.findByEmailWithRoles(storedToken.getUser().getEmail())
+                .orElseThrow(() -> new IllegalArgumentException("User not found for refresh token"));
 
         List<Role> roles = extractRoles(user);
+        // Lọc các vai trò mong muốn ('ADMIN', 'CONTRIBUTOR') để đưa vào token
+        List<String> authorizedRoleNames = roles.stream()
+    .map(Role::getName)
+    .collect(Collectors.toList());
         List<Permission> permissions = extractPermissions(roles);
 
         String newAccessToken = jwtService.generateAccessToken(
                 user,
-                roles.stream().map(Role::getName).collect(Collectors.toList()),
+                authorizedRoleNames,
                 permissions.stream().map(Permission::getName).collect(Collectors.toList())
         );
 
@@ -234,7 +243,10 @@ public class AuthServiceImpl extends BaseAuthService implements AuthService {
     @Override
     @Transactional
     public UserInfoDto getCurrentUser(User currentUser) {
-        List<Role> roles = extractRoles(currentUser);
+        // Fetch the user again to ensure roles are eagerly loaded
+        User userWithRoles = userRepository.findByEmailWithRoles(currentUser.getEmail())
+                .orElseThrow(() -> new IllegalArgumentException("User not found"));
+        List<Role> roles = extractRoles(userWithRoles);
         List<Permission> permissions = extractPermissions(roles);
         return UserMapper.toUserInfoDto(currentUser, roles, permissions);
     }

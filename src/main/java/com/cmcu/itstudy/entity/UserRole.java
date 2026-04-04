@@ -1,5 +1,6 @@
 package com.cmcu.itstudy.entity;
 
+import com.cmcu.itstudy.entity.Role;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -20,12 +21,12 @@ import java.util.UUID;
 
 @Getter
 @Setter
-@Builder
-@NoArgsConstructor
-@AllArgsConstructor
 @Entity
 @Table(name = "tbl_user_roles")
 @IdClass(UserRole.UserRoleId.class)
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class UserRole {
 
     @Id
@@ -36,13 +37,17 @@ public class UserRole {
     @Column(name = "role_id", columnDefinition = "uniqueidentifier")
     private UUID roleId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "user_id", insertable = false, updatable = false)
     private User user;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "role_id", insertable = false, updatable = false)
     private Role role;
+
+    public Role getRole() {
+        return this.role;
+    }
 
     @Column(name = "created_at")
     private LocalDateTime createdAt;
@@ -73,4 +78,3 @@ public class UserRole {
         }
     }
 }
-

@@ -46,10 +46,23 @@ public class UserDetailsServiceImpl implements UserDetailsService {
             }
         }
 
-        java.util.List<GrantedAuthority> authorities = permissionCodes.stream()
+        java.util.List<GrantedAuthority> authorities = new java.util.ArrayList<>();
+
+        // Add permissions as GrantedAuthorities
+        permissionCodes.stream()
                 .map(SimpleGrantedAuthority::new)
-                .map(auth -> (GrantedAuthority) auth)
-                .toList();
+                .forEach(authorities::add);
+
+        // Add roles as GrantedAuthorities with "ROLE_" prefix
+        if (user.getUserRoles() != null) {
+            for (UserRole userRole : user.getUserRoles()) {
+                Role role = userRole.getRole();
+                if (role != null && role.getName() != null) {
+                    authorities.add(new SimpleGrantedAuthority("ROLE_" + role.getName()));
+                }
+            }
+        }
+
 
         return new UserDetailsImpl(user, authorities);
     }
