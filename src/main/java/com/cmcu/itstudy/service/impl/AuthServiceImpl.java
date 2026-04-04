@@ -1,5 +1,15 @@
 package com.cmcu.itstudy.service.impl;
 
+import java.time.LocalDateTime;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+import org.springframework.stereotype.Service;
+
 import com.cmcu.itstudy.dto.auth.ForgotPasswordRequestDto;
 import com.cmcu.itstudy.dto.auth.LoginRequestDto;
 import com.cmcu.itstudy.dto.auth.RefreshRequestDto;
@@ -24,16 +34,8 @@ import com.cmcu.itstudy.repository.UserRoleRepository;
 import com.cmcu.itstudy.service.base.BaseAuthService;
 import com.cmcu.itstudy.service.contract.AuthService;
 import com.cmcu.itstudy.service.contract.JwtService;
-import jakarta.transaction.Transactional;
-import org.springframework.stereotype.Service;
 
-import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
-import java.util.stream.Collectors;
+import jakarta.transaction.Transactional;
 
 @Service
 public class AuthServiceImpl extends BaseAuthService implements AuthService {
@@ -342,6 +344,85 @@ public class AuthServiceImpl extends BaseAuthService implements AuthService {
             }
         }
         return permissions.stream().toList();
+    }
+    @Override
+    @Transactional
+    public TokenResponseDto loginWithOAuth(String email) {
+
+        LocalDateTime now = LocalDateTime.now();
+
+        // 🔍 tìm user
+        User user = userRepository.findByEmailWithRoles(email).orElse(null);
+
+        // 👉 nếu chưa có → tạo mới
+        if (user == null) {
+
+            user = User.builder()
+                    .email(email)
+                    .password(encodePassword("oauth2user")) // password fake
+                    .fullName(email)
+                    .status("ACTIVE")
+                    .emailVerified(true)
+                    .createdAt(now)
+                    .updatedAt(now)
+                    .build();
+
+            user = userRepository.save(user);
+
+            // 👉 gán role USER (giống register)
+            Role defaultRole = roleRepository.findByName(ROLE_USER)
+                    .orElseThrow(() -> new IllegalArgumentException("Default role USER not found"));
+
+            UserRole userRole = UserRole.builder()
+                    .userId(user.getId())
+                    .roleId(defaultRole.getId())
+                    .createdAt(now)
+                    .build();
+
+            userRoleRepository.save(userRole);
+
+            // load lại để có roles
+            user = userRepository.findByEmailWithRoles(email).orElseThrow();
+        }
+
+        // 🔥 giống login()
+        List<Role> roles = extractRoles(user);
+
+        List<String> roleNames = roles.stream()
+                .map(Role::getName)
+                .toList();
+
+        List<Permission> permissions = extractPermissions(roles);
+
+        String accessToken = jwtService.generateAccessToken(
+                user,
+                roleNames,
+                permissions.stream().map(Permission::getName).toList()
+        );
+
+        String refreshTokenValue = jwtService.generateRefreshToken(user);
+
+        LocalDateTime refreshExpiry = now.plusSeconds(jwtService.getRefreshTokenExpirySeconds());
+
+        RefreshToken refreshToken = RefreshToken.builder()
+                .user(user)
+                .token(refreshTokenValue)
+                .expiryDate(refreshExpiry)
+                .revoked(false)
+                .createdAt(now)
+                .build();
+
+        refreshTokenRepository.save(refreshToken);
+
+        UserInfoDto userInfoDto = UserMapper.toUserInfoDto(user, roles, permissions);
+
+        return TokenResponseDto.builder()
+                .accessToken(accessToken)
+                .refreshToken(refreshTokenValue)
+                .expiresIn(jwtService.getAccessTokenExpirySeconds())
+                .refreshTokenExpiresIn(jwtService.getRefreshTokenExpirySeconds())
+                .user(userInfoDto)
+                .build();
     }
 }
 
