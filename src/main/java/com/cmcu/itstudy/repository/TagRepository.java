@@ -11,6 +11,14 @@ import java.util.UUID;
 
 public interface TagRepository extends JpaRepository<Tag, UUID> {
 
+    boolean existsBySlug(String slug);
+
+    boolean existsByName(String name);
+
+    boolean existsBySlugAndIdNot(String slug, UUID id);
+
+    boolean existsByNameAndIdNot(String name, UUID id);
+
     @Query("""
             select t
             from Tag t

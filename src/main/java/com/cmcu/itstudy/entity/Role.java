@@ -8,6 +8,8 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -46,6 +48,10 @@ public class Role {
     @Column(name = "updated_at", nullable = false)
     private LocalDateTime updatedAt;
 
+    @Column(name = "is_active", nullable = true)
+    @Builder.Default
+    private Boolean active = Boolean.TRUE;
+
     @JsonIgnore
     @OneToMany(mappedBy = "role", fetch = FetchType.LAZY)
     private Set<UserRole> userRoles = new HashSet<>();
@@ -53,5 +59,19 @@ public class Role {
     @JsonIgnore
     @OneToMany(mappedBy = "role", fetch = FetchType.LAZY)
     private Set<RolePermission> rolePermissions = new HashSet<>();
+
+    @PrePersist
+    void prePersist() {
+        if (this.active == null) {
+            this.active = Boolean.TRUE;
+        }
+    }
+
+    @PreUpdate
+    void preUpdate() {
+        if (this.active == null) {
+            this.active = Boolean.TRUE;
+        }
+    }
 }
 

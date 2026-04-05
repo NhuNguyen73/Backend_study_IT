@@ -29,13 +29,15 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         User user = userRepository.findByEmail(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
-        // Collect permissions from roles -> rolePermissions -> permission.name
         java.util.Set<String> permissionCodes = new java.util.HashSet<>();
 
         if (user.getUserRoles() != null) {
             for (UserRole userRole : user.getUserRoles()) {
                 Role role = userRole.getRole();
-                if (role != null && role.getRolePermissions() != null) {
+                if (role == null || Boolean.FALSE.equals(role.getActive())) {
+                    continue;
+                }
+                if (role.getRolePermissions() != null) {
                     for (RolePermission rp : role.getRolePermissions()) {
                         Permission permission = rp.getPermission();
                         if (permission != null && permission.getName() != null) {
@@ -48,23 +50,19 @@ public class UserDetailsServiceImpl implements UserDetailsService {
 
         java.util.List<GrantedAuthority> authorities = new java.util.ArrayList<>();
 
-        // Add permissions as GrantedAuthorities
         permissionCodes.stream()
                 .map(SimpleGrantedAuthority::new)
                 .forEach(authorities::add);
 
-        // Add roles as GrantedAuthorities with "ROLE_" prefix
         if (user.getUserRoles() != null) {
             for (UserRole userRole : user.getUserRoles()) {
                 Role role = userRole.getRole();
-                if (role != null && role.getName() != null) {
+                if (role != null && role.getName() != null && !Boolean.FALSE.equals(role.getActive())) {
                     authorities.add(new SimpleGrantedAuthority("ROLE_" + role.getName()));
                 }
             }
         }
 
-
         return new UserDetailsImpl(user, authorities);
     }
 }
-
