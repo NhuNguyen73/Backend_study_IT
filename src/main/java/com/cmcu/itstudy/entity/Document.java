@@ -26,7 +26,9 @@ import lombok.Setter;
 import lombok.ToString;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -147,6 +149,48 @@ public class Document {
     @ToString.Exclude
     @JsonIgnore
     private Set<DocumentBookmark> bookmarks = new HashSet<>();
+
+    @OneToMany(mappedBy = "document", fetch = FetchType.LAZY)
+    @ToString.Exclude
+    @JsonIgnore
+    @Builder.Default
+    private List<DocumentFile> files = new ArrayList<>();
+
+    @OneToMany(mappedBy = "document", fetch = FetchType.LAZY)
+    @ToString.Exclude
+    @JsonIgnore
+    @Builder.Default
+    private List<DocumentView> views = new ArrayList<>();
+
+    @OneToMany(mappedBy = "document", fetch = FetchType.LAZY)
+    @ToString.Exclude
+    @JsonIgnore
+    @Builder.Default
+    private List<DocumentDownload> downloads = new ArrayList<>();
+
+    @OneToMany(mappedBy = "document", fetch = FetchType.LAZY)
+    @ToString.Exclude
+    @JsonIgnore
+    @Builder.Default
+    private List<DocumentComment> comments = new ArrayList<>();
+
+    @OneToMany(mappedBy = "document", fetch = FetchType.LAZY)
+    @ToString.Exclude
+    @JsonIgnore
+    @Builder.Default
+    private List<DocumentQuiz> documentQuizzes = new ArrayList<>();
+
+    @OneToMany(mappedBy = "sourceDocument", fetch = FetchType.LAZY)
+    @ToString.Exclude
+    @JsonIgnore
+    @Builder.Default
+    private List<DocumentPreference> preferences = new ArrayList<>();
+
+    @OneToMany(mappedBy = "document", fetch = FetchType.LAZY)
+    @ToString.Exclude
+    @JsonIgnore
+    @Builder.Default
+    private List<DocumentReport> reports = new ArrayList<>();
 
     @PrePersist
     void prePersist() {

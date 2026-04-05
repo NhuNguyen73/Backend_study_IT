@@ -7,10 +7,17 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.UUID;
 
 public interface DocumentDownloadRepository extends JpaRepository<DocumentDownload, Long> {
 
     long countByDocument(Document document);
+
+    long countByDocument_Id(UUID documentId);
+
+    default long countByDocumentId(UUID documentId) {
+        return countByDocument_Id(documentId);
+    }
 
     long countByDocumentAndDownloadedAtAfter(Document document, LocalDateTime from);
 

@@ -11,4 +11,6 @@ import java.util.UUID;
 public interface DocumentTagRepository extends JpaRepository<DocumentTag, DocumentTagId> {
 
     List<DocumentTag> findByDocumentIdIn(Collection<UUID> documentIds);
+
+    List<DocumentTag> findByDocumentId(UUID documentId);
 }

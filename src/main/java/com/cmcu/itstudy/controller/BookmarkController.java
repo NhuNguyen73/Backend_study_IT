@@ -4,7 +4,7 @@ import com.cmcu.itstudy.dto.common.ApiResponse;
 import com.cmcu.itstudy.dto.common.MessageResponseDto;
 import com.cmcu.itstudy.dto.document.PagedResponseDocumentCardDto;
 import com.cmcu.itstudy.security.UserDetailsImpl;
-import com.cmcu.itstudy.service.contract.DocumentService;
+import com.cmcu.itstudy.service.contract.DocumentOperationsService;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import org.springframework.http.ResponseEntity;
@@ -24,10 +24,10 @@ import java.util.UUID;
 @RequestMapping("/api")
 public class BookmarkController {
 
-    private final DocumentService documentService;
+    private final DocumentOperationsService documentOperationsService;
 
-    public BookmarkController(DocumentService documentService) {
-        this.documentService = documentService;
+    public BookmarkController(DocumentOperationsService documentOperationsService) {
+        this.documentOperationsService = documentOperationsService;
     }
 
     @PostMapping("/bookmarks/{id}")
@@ -37,7 +37,7 @@ public class BookmarkController {
             @AuthenticationPrincipal UserDetailsImpl currentUser
     ) {
         UUID userId = currentUser.getUser().getId();
-        documentService.toggleBookmark(documentId, userId);
+        documentOperationsService.toggleBookmark(documentId, userId);
         MessageResponseDto body = MessageResponseDto.builder()
                 .message("Bookmark toggled")
                 .build();
@@ -51,7 +51,7 @@ public class BookmarkController {
             @AuthenticationPrincipal UserDetailsImpl currentUser
     ) {
         UUID userId = currentUser.getUser().getId();
-        documentService.toggleBookmark(documentId, userId);
+        documentOperationsService.toggleBookmark(documentId, userId);
         MessageResponseDto body = MessageResponseDto.builder()
                 .message("Bookmark toggled")
                 .build();
@@ -67,7 +67,7 @@ public class BookmarkController {
     ) {
         UUID userId = currentUser.getUser().getId();
         // Service trả về list, ở đây wrap lại paging đơn giản cho khớp OpenAPI
-        var list = documentService.getMyBookmarks(userId);
+        var list = documentOperationsService.getMyBookmarks(userId);
         int fromIndex = Math.min(page * size, list.size());
         int toIndex = Math.min(fromIndex + size, list.size());
         var pageContent = list.subList(fromIndex, toIndex);

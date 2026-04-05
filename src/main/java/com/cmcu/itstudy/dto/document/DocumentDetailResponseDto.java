@@ -6,7 +6,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
-import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -14,22 +14,10 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 public class DocumentDetailResponseDto {
-    private String id;
-    private String title;
-    private String thumbnail;
-    private String categoryName;
-    private String authorName;
-    private LocalDateTime createdAt;
-    private Integer viewCount;
-    private Integer downloadCount;
-    private Boolean isBookmarked;
-    private FileTypeDto fileType;
-    private java.util.List<String> tags;
-    private String description;
-    private String fileUrl;
-    private Long fileSize;
-    private DocumentStatusDto status;
-    private Boolean isDeleted;
-    private LocalDateTime deletedAt;
-    private String deletedBy;
+    private DocumentDetailInfoDto documentInfo;
+    private DocumentDetailStatsDto stats;
+    private DocumentPrimaryFileDto file;
+    private DocumentDetailCommentsDto comments;
+    private List<DocumentDetailQuizDto> quizzes;
+    private List<DocumentRelatedDocumentDto> relatedDocuments;
 }

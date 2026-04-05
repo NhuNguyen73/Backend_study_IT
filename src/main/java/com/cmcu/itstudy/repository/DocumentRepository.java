@@ -4,6 +4,7 @@ import com.cmcu.itstudy.entity.Document;
 import com.cmcu.itstudy.enums.DocumentStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
@@ -115,4 +116,18 @@ public interface DocumentRepository extends JpaRepository<Document, UUID>, JpaSp
     List<Document> findTrendingByDownloads(@Param("status") DocumentStatus status,
                                            @Param("from") LocalDateTime from,
                                            Pageable pageable);
+
+    @Query("""
+            select d
+            from Document d
+            where d.status = :status
+              and d.deleted = false
+              and d.category.id = :categoryId
+              and d.id <> :excludeDocumentId
+            order by d.viewCount desc, d.downloadCount desc, d.createdAt desc
+            """)
+    Slice<Document> findRelatedDocumentsForDetail(@Param("status") DocumentStatus status,
+                                                  @Param("categoryId") UUID categoryId,
+                                                  @Param("excludeDocumentId") UUID excludeDocumentId,
+                                                  Pageable pageable);
 }
