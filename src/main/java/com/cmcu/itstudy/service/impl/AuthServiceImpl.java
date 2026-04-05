@@ -347,12 +347,20 @@ public class AuthServiceImpl extends BaseAuthService implements AuthService {
     }
     @Override
     @Transactional
-    public TokenResponseDto loginWithOAuth(String email, String name, String avatar) {
+    public TokenResponseDto loginWithOAuth(
+            String email,
+            String name,
+            String avatar,
+            String providerId,
+            String provider
+    ) {
 
         LocalDateTime now = LocalDateTime.now();
 
         String resolvedName = (name != null && !name.isBlank()) ? name.trim() : null;
         String resolvedAvatar = (avatar != null && !avatar.isBlank()) ? avatar.trim() : null;
+        String resolvedProvider = (provider != null && !provider.isBlank()) ? provider.trim().toUpperCase() : null;
+        String resolvedProviderId = (providerId != null && !providerId.isBlank()) ? providerId.trim() : null;
 
         User user = userRepository.findByEmailWithRoles(email).orElse(null);
 
@@ -364,6 +372,8 @@ public class AuthServiceImpl extends BaseAuthService implements AuthService {
                     .password(encodePassword("OAUTH2_USER_" + UUID.randomUUID()))
                     .fullName(fullName)
                     .avatar(resolvedAvatar)
+                    .provider(resolvedProvider)
+                    .providerId(resolvedProviderId)
                     .status("ACTIVE")
                     .emailVerified(true)
                     .createdAt(now)
