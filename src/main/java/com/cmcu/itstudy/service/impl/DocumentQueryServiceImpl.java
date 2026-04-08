@@ -3,6 +3,7 @@ package com.cmcu.itstudy.service.impl;
 import com.cmcu.itstudy.dto.document.DocumentCardResponseDto;
 import com.cmcu.itstudy.dto.document.DocumentDetailQuizDto;
 import com.cmcu.itstudy.dto.document.DocumentDetailResponseDto;
+import com.cmcu.itstudy.dto.document.DocumentFileUrlResponseDto;
 import com.cmcu.itstudy.dto.document.DocumentPrimaryFileDto;
 import com.cmcu.itstudy.dto.document.DocumentRelatedDocumentDto;
 import com.cmcu.itstudy.entity.Document;
@@ -19,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Collections;
 import java.util.List;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -89,5 +91,15 @@ public class DocumentQueryServiceImpl implements DocumentQueryService {
                 quizzes,
                 related
         );
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public DocumentFileUrlResponseDto getDocumentPrimaryFileUrl(UUID documentId) {
+        documentService.getById(documentId);
+
+        return documentFileRepository.findByDocumentIdAndPrimaryTrue(documentId)
+                .map(DocumentMapper::toFileUrlResponseDto)
+                .orElseThrow(() -> new NoSuchElementException("Primary document file not found"));
     }
 }

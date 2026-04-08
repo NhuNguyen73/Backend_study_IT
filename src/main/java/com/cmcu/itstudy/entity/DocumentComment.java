@@ -7,6 +7,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
@@ -34,7 +35,14 @@ import java.util.UUID;
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @ToString
 @Entity
-@Table(name = "tbl_document_comments")
+@Table(
+        name = "tbl_document_comments",
+        indexes = {
+                @Index(name = "idx_document_comment_document_id", columnList = "document_id"),
+                @Index(name = "idx_document_comment_parent_comment_id", columnList = "parent_comment_id"),
+                @Index(name = "idx_document_comment_like_count", columnList = "like_count")
+        }
+)
 public class DocumentComment {
 
     @Id
@@ -66,6 +74,12 @@ public class DocumentComment {
     @ToString.Exclude
     @JsonIgnore
     private User author;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "reply_to_user_id")
+    @ToString.Exclude
+    @JsonIgnore
+    private User replyToUser;
 
     @Column(name = "body", nullable = false, columnDefinition = "nvarchar(max)")
     private String body;

@@ -7,6 +7,7 @@ import com.cmcu.itstudy.dto.document.DocumentDetailInfoDto;
 import com.cmcu.itstudy.dto.document.DocumentDetailQuizDto;
 import com.cmcu.itstudy.dto.document.DocumentDetailResponseDto;
 import com.cmcu.itstudy.dto.document.DocumentDetailStatsDto;
+import com.cmcu.itstudy.dto.document.DocumentFileUrlResponseDto;
 import com.cmcu.itstudy.dto.document.DocumentPrimaryFileDto;
 import com.cmcu.itstudy.dto.document.DocumentRelatedDocumentDto;
 import com.cmcu.itstudy.dto.document.FileTypeDto;
@@ -100,6 +101,15 @@ public final class DocumentMapper {
                 .fileUrl(file.getStoragePath())
                 .fileType(file.getFileExtension())
                 .fileSize(file.getSizeBytes())
+                .build();
+    }
+
+    public static DocumentFileUrlResponseDto toFileUrlResponseDto(DocumentFile file) {
+        if (file == null) {
+            return null;
+        }
+        return DocumentFileUrlResponseDto.builder()
+                .fileUrl(file.getStoragePath())
                 .build();
     }
 

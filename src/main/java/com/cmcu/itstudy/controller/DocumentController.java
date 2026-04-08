@@ -2,6 +2,7 @@ package com.cmcu.itstudy.controller;
 
 import com.cmcu.itstudy.dto.common.ApiResponse;
 import com.cmcu.itstudy.dto.document.DocumentDetailResponseDto;
+import com.cmcu.itstudy.dto.document.DocumentFileUrlResponseDto;
 import com.cmcu.itstudy.security.UserDetailsImpl;
 import com.cmcu.itstudy.service.contract.DocumentQueryService;
 import org.springframework.http.ResponseEntity;
@@ -31,5 +32,13 @@ public class DocumentController {
         UUID currentUserId = currentUser != null ? currentUser.getUser().getId() : null;
         DocumentDetailResponseDto data = documentQueryService.getDocumentDetail(id, currentUserId);
         return ResponseEntity.ok(ApiResponse.success(data, "Document detail"));
+    }
+
+    @GetMapping("/documents/{id}/file")
+    public ResponseEntity<ApiResponse<DocumentFileUrlResponseDto>> getDocumentPrimaryFileUrl(
+            @PathVariable("id") UUID id
+    ) {
+        DocumentFileUrlResponseDto data = documentQueryService.getDocumentPrimaryFileUrl(id);
+        return ResponseEntity.ok(ApiResponse.success(data, "Document file URL"));
     }
 }
