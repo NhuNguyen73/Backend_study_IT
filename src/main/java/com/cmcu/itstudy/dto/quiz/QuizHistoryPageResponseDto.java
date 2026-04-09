@@ -19,4 +19,5 @@ public class QuizHistoryPageResponseDto {
     private Integer page;
     private Integer totalPages;
     private Long totalItems;
+    private QuizHistorySummaryDto summary;
 }

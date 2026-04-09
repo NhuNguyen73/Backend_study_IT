@@ -10,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -37,6 +38,29 @@ public interface QuizAttemptRepository extends JpaRepository<QuizAttempt, UUID> 
     List<QuizAttempt> findByUserIdOrderByStartTimeDesc(UUID userId);
 
     Page<QuizAttempt> findByUserId(UUID userId, Pageable pageable);
+
+    long countByUserIdAndStatusIn(UUID userId, Collection<String> statuses);
+
+    long countByUserIdAndStatus(UUID userId, String status);
+
+    @Query("""
+            select avg(qa.score)
+            from QuizAttempt qa
+            where qa.userId = :userId
+              and upper(qa.status) in ('PASSED', 'FAILED')
+              and qa.score is not null
+            """)
+    Double averageSubmittedScore(@Param("userId") UUID userId);
+
+    @Query(value = """
+            select coalesce(sum(datediff(second, qa.start_time, qa.end_time)), 0)
+            from tbl_quiz_attempts qa
+            where qa.user_id = :userId
+              and qa.end_time is not null
+              and qa.start_time is not null
+              and qa.end_time >= qa.start_time
+            """, nativeQuery = true)
+    Number sumDurationSecondsByUser(@Param("userId") UUID userId);
 
     @Query("""
             select distinct qa

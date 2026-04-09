@@ -4,6 +4,7 @@ import com.cmcu.itstudy.dto.document.DocumentDetailQuizDto;
 import com.cmcu.itstudy.dto.document.QuizListPageResponseDto;
 import com.cmcu.itstudy.dto.quiz.QuizHistoryItemDto;
 import com.cmcu.itstudy.dto.quiz.QuizHistoryPageResponseDto;
+import com.cmcu.itstudy.dto.quiz.QuizHistorySummaryDto;
 import com.cmcu.itstudy.dto.quiz.QuizPreviewResponseDto;
 import com.cmcu.itstudy.dto.quiz.QuizResultResponseDto;
 import com.cmcu.itstudy.dto.quiz.StartQuizResponseDto;
@@ -281,7 +282,27 @@ public class QuizServiceImpl implements QuizService {
         int safeSize = size > 0 ? size : 10;
         Pageable pageable = PageRequest.of(safePage, safeSize, Sort.by("startTime").descending());
         Page<QuizAttempt> attemptPage = quizAttemptRepository.findByUserId(userId, pageable);
-        return QuizMapper.toQuizHistoryPageResponseDto(attemptPage);
+        QuizHistoryPageResponseDto dto = QuizMapper.toQuizHistoryPageResponseDto(attemptPage);
+        dto.setSummary(buildQuizHistorySummary(userId));
+        return dto;
+    }
+
+    private QuizHistorySummaryDto buildQuizHistorySummary(UUID userId) {
+        long finished = quizAttemptRepository.countByUserIdAndStatusIn(userId, List.of("PASSED", "FAILED"));
+        Double passRatePercent = null;
+        if (finished > 0) {
+            long passed = quizAttemptRepository.countByUserIdAndStatus(userId, "PASSED");
+            passRatePercent = (100.0d * passed) / finished;
+        }
+        Double averageScore = quizAttemptRepository.averageSubmittedScore(userId);
+        Number secSum = quizAttemptRepository.sumDurationSecondsByUser(userId);
+        long totalSecs = secSum != null ? secSum.longValue() : 0L;
+        long totalMinutes = totalSecs / 60L;
+        return QuizHistorySummaryDto.builder()
+                .passRatePercent(passRatePercent)
+                .averageScore(averageScore)
+                .totalTimeSpentMinutes(totalMinutes)
+                .build();
     }
 
     @Override

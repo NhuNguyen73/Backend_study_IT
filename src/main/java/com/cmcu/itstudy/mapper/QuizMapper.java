@@ -13,6 +13,7 @@ import com.cmcu.itstudy.entity.QuizQuestion;
 import com.cmcu.itstudy.entity.QuizQuestionOption;
 import org.springframework.data.domain.Page;
 
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -51,14 +52,27 @@ public final class QuizMapper {
         if (attempt == null) {
             return null;
         }
+        Long spentSeconds = null;
+        if (attempt.getStartTime() != null && attempt.getEndTime() != null) {
+            long sec = ChronoUnit.SECONDS.between(attempt.getStartTime(), attempt.getEndTime());
+            spentSeconds = Math.max(sec, 0L);
+        }
         return QuizHistoryItemDto.builder()
                 .attemptId(uuidToString(attempt.getId()))
                 .quizId(attempt.getQuiz() != null ? uuidToString(attempt.getQuiz().getId()) : null)
                 .quizTitle(attempt.getQuiz() != null ? attempt.getQuiz().getTitle() : null)
+                .attemptNumber(attempt.getAttemptNumber())
+                .startTime(attempt.getStartTime())
                 .score(attempt.getScore())
+                .maxScore(attempt.getMaxScore())
                 .scorePercent(attempt.getScorePercent())
                 .attemptDate(attempt.getStartTime())
                 .status(attempt.getStatus())
+                .totalTimeSpentSeconds(spentSeconds)
+                .rankingPercent(null)
+                .rankingLabel(null)
+                .progressPercent(null)
+                .level(null)
                 .build();
     }
 
