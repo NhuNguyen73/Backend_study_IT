@@ -1,33 +1,59 @@
 package com.cmcu.itstudy.service.impl;
 
-import com.cmcu.itstudy.entity.Document;
+import com.cmcu.itstudy.dto.document.DocumentCardDto;
+import com.cmcu.itstudy.dto.document.DocumentCreateRequestDto;
+import com.cmcu.itstudy.dto.document.DocumentUpdateRequestDto;
+import com.cmcu.itstudy.dto.document.MyDocumentCardResponseDto;
+import com.cmcu.itstudy.entity.*;
 import com.cmcu.itstudy.enums.DocumentStatus;
-import com.cmcu.itstudy.repository.DocumentRepository;
+import com.cmcu.itstudy.enums.FileType;
+import com.cmcu.itstudy.repository.*;
 import com.cmcu.itstudy.service.contract.DocumentService;
+import com.cmcu.itstudy.util.SlugUtils;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 public class DocumentServiceImpl implements DocumentService {
 
     private final DocumentRepository documentRepository;
+    private final DocumentTagRepository documentTagRepository;
+    private final DocumentAuthorRepository documentAuthorRepository; // Assuming this exists for mapping authors if needed beyond createdBy
+    private final CategoryRepository categoryRepository;
+    private final TagRepository tagRepository;
+    private final UserRepository userRepository; // To fetch user details like author name
 
-    public DocumentServiceImpl(DocumentRepository documentRepository) {
+    public DocumentServiceImpl(DocumentRepository documentRepository,
+                               DocumentTagRepository documentTagRepository,
+                               CategoryRepository categoryRepository,
+                               TagRepository tagRepository,
+                               UserRepository userRepository,
+                               DocumentAuthorRepository documentAuthorRepository) { // Injecting dependencies
         this.documentRepository = documentRepository;
+        this.documentTagRepository = documentTagRepository;
+        this.categoryRepository = categoryRepository;
+        this.tagRepository = tagRepository;
+        this.userRepository = userRepository;
+        this.documentAuthorRepository = documentAuthorRepository;
     }
 
     @Transactional(readOnly = true)
     @Override
     public Document getById(UUID id) {
         return documentRepository.findById(id)
-                .orElseThrow(() -> new NoSuchElementException("Document not found"));
+                .orElseThrow(() -> new NoSuchElementException("Document not found with id: " + id));
     }
 
     @Transactional(readOnly = true)
@@ -43,5 +69,264 @@ public class DocumentServiceImpl implements DocumentService {
                 documentId,
                 PageRequest.of(0, Math.max(1, limit)));
         return slice.getContent();
+    }
+
+    @Override
+    @Transactional
+    public DocumentCardDto createDocument(DocumentCreateRequestDto documentCreateRequestDto, User currentUser) {
+        // 1. Find or create Category
+        Category category = categoryRepository.findByName(documentCreateRequestDto.getCategory())
+                .orElseThrow(() -> new NoSuchElementException("Category not found: " + documentCreateRequestDto.getCategory()));
+
+        // 2. Create Document entity
+        Document document = Document.builder()
+                .title(documentCreateRequestDto.getTitle())
+                .slug(SlugUtils.resolveSlug(documentCreateRequestDto.getTitle(), documentCreateRequestDto.getTitle())) // Generate slug from title
+                .description(documentCreateRequestDto.getDescription())
+                .fileUrl(documentCreateRequestDto.getDocumentUrl())
+                .fileName(documentCreateRequestDto.getFileName())
+                .fileSize(documentCreateRequestDto.getFileSizeBytes())
+                .thumbnailUrl(documentCreateRequestDto.getThumbnailUrl())
+                .category(category) // Link to Category
+                .createdBy(currentUser) // Set creator
+                .updatedBy(currentUser) // Set initial updater
+                .status(DocumentStatus.PENDING) // Default status
+                .viewCount(0L)
+                .downloadCount(0L)
+                .bookmarkCount(0L)
+                .deleted(false)
+                .build();
+
+        // Set file type based on extension or frontend hint (more robust to check extension from fileName)
+        String fileName = document.getFileName();
+        if (fileName != null && !fileName.isEmpty()) {
+            String lowerCaseFileName = fileName.toLowerCase();
+            if (lowerCaseFileName.endsWith(".pdf")) {
+                document.setFileType(FileType.PDF);
+            } else if (lowerCaseFileName.endsWith(".doc") || lowerCaseFileName.endsWith(".docx")) {
+                document.setFileType(FileType.DOC);
+            } else if (lowerCaseFileName.endsWith(".ppt") || lowerCaseFileName.endsWith(".pptx")) {
+                document.setFileType(FileType.PPT);
+            } else {
+                document.setFileType(FileType.OTHER);
+            }
+        } else {
+             document.setFileType(FileType.OTHER); // Default if no name
+        }
+
+
+        // 3. Save document to get ID and persist associations
+        Document savedDocument = documentRepository.save(document);
+
+        // 4. Handle Tags and DocumentTag associations
+        Set<DocumentTag> documentTags = new HashSet<>();
+        for (String tagName : documentCreateRequestDto.getTags()) {
+            Tag tag = tagRepository.findByName(tagName)
+                    .orElseGet(() -> { // Create tag if not exists
+                        Tag newTag = Tag.builder()
+                                .name(tagName)
+                                .slug(SlugUtils.resolveSlug(tagName, tagName))
+                                .build();
+                        return tagRepository.save(newTag);
+                    });
+
+            DocumentTag documentTag = DocumentTag.builder()
+                    .documentId(savedDocument.getId())
+                    .tagId(tag.getId())
+                    .document(savedDocument) // Set back-reference for entity graph loading
+                    .tag(tag) // Set back-reference for entity graph loading
+                    .createdAt(LocalDateTime.now())
+                    .build();
+            documentTags.add(documentTag);
+        }
+        savedDocument.setDocumentTags(documentTags); // Set associations
+        // Note: DocumentTag will be saved via cascade or explicit save if needed. JPA typically handles this if configured.
+        // For safety, we can explicitly save them if cascade is not set up correctly.
+        documentTagRepository.saveAll(documentTags);
+
+
+        // 5. Map to DocumentCardDto for response
+        return mapToDocumentCardDto(savedDocument, currentUser);
+    }
+
+    @Override
+    @Transactional
+    public DocumentCardDto updateDocument(UUID documentId, DocumentUpdateRequestDto documentUpdateRequestDto, User currentUser) {
+        Document existingDocument = getById(documentId);
+
+        // Check if current user is the owner (or has permission to edit)
+        // For now, assume user has permission if they are authenticated.
+        // A more robust check would involve checking existingDocument.getCreatedBy().getId()
+        if (!existingDocument.getCreatedBy().getId().equals(currentUser.getId())) {
+            throw new SecurityException("User does not have permission to update this document.");
+        }
+
+        // 1. Find or create Category
+        Category category = categoryRepository.findByName(documentUpdateRequestDto.getCategory())
+                .orElseThrow(() -> new NoSuchElementException("Category not found: " + documentUpdateRequestDto.getCategory()));
+
+        // 2. Update Document entity fields
+        existingDocument.setTitle(documentUpdateRequestDto.getTitle());
+        existingDocument.setDescription(documentUpdateRequestDto.getDescription());
+        // Only update slug if it's provided and different, or if title changed significantly.
+        // For now, let's regenerate slug if title changes.
+        if (!existingDocument.getTitle().equals(documentUpdateRequestDto.getTitle())) {
+            existingDocument.setSlug(SlugUtils.resolveSlug(documentUpdateRequestDto.getTitle(), documentUpdateRequestDto.getTitle()));
+        }
+        existingDocument.setFileUrl(documentUpdateRequestDto.getDocumentUrl());
+        existingDocument.setFileName(documentUpdateRequestDto.getFileName());
+        existingDocument.setFileSize(documentUpdateRequestDto.getFileSizeBytes());
+        existingDocument.setThumbnailUrl(documentUpdateRequestDto.getThumbnailUrl());
+        existingDocument.setCategory(category); // Link to updated Category
+        existingDocument.setUpdatedBy(currentUser); // Set updater
+
+        // Update file type if file name changed
+        String fileName = existingDocument.getFileName();
+        if (fileName != null && !fileName.isEmpty()) {
+            String lowerCaseFileName = fileName.toLowerCase();
+            if (lowerCaseFileName.endsWith(".pdf")) {
+                existingDocument.setFileType(FileType.PDF);
+            } else if (lowerCaseFileName.endsWith(".doc") || lowerCaseFileName.endsWith(".docx")) {
+                existingDocument.setFileType(FileType.DOC);
+            } else if (lowerCaseFileName.endsWith(".ppt") || lowerCaseFileName.endsWith(".pptx")) {
+                existingDocument.setFileType(FileType.PPT);
+            } else {
+                existingDocument.setFileType(FileType.OTHER);
+            }
+        } else {
+             existingDocument.setFileType(FileType.OTHER);
+        }
+
+
+        // 3. Handle Tags and DocumentTag associations
+        // Remove existing tags for this document
+        documentTagRepository.deleteAllByDocumentId(existingDocument.getId()); // Need to add this method to repo
+
+        // Add new tags
+        Set<DocumentTag> newDocumentTags = new HashSet<>();
+        for (String tagName : documentUpdateRequestDto.getTags()) {
+            Tag tag = tagRepository.findByName(tagName)
+                    .orElseGet(() -> { // Create tag if not exists
+                        Tag newTag = Tag.builder()
+                                .name(tagName)
+                                .slug(SlugUtils.resolveSlug(tagName, tagName))
+                                .build();
+                        return tagRepository.save(newTag);
+                    });
+
+            DocumentTag documentTag = DocumentTag.builder()
+                    .documentId(existingDocument.getId())
+                    .tagId(tag.getId())
+                    .document(existingDocument) // Set back-reference
+                    .tag(tag) // Set back-reference
+                    .createdAt(LocalDateTime.now())
+                    .build();
+            newDocumentTags.add(documentTag);
+        }
+        // Persist new associations
+        documentTagRepository.saveAll(newDocumentTags);
+        existingDocument.setDocumentTags(newDocumentTags); // Update set on document entity
+
+        // 4. Save updated document
+        Document updatedDocument = documentRepository.save(existingDocument);
+
+        // 5. Map to DocumentCardDto for response
+        return mapToDocumentCardDto(updatedDocument, currentUser);
+    }
+
+    @Override
+    @Transactional
+    public void deleteDocument(UUID documentId, User currentUser) {
+        Document document = getById(documentId);
+
+        // Check ownership before deletion
+        if (!document.getCreatedBy().getId().equals(currentUser.getId())) {
+            throw new SecurityException("User does not have permission to delete this document.");
+        }
+
+        // Perform soft delete
+        document.setDeleted(true);
+        document.setDeletedAt(LocalDateTime.now());
+        document.setDeletedBy(currentUser);
+        documentRepository.save(document);
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public List<MyDocumentCardResponseDto> getMyDocuments(User currentUser) {
+        // Fetch documents created by the current user, not deleted, ordered by creation date
+        List<Document> documents = documentRepository.findByCreatedByAndDeletedFalseOrderByCreatedAtDesc(currentUser);
+
+        // Map to DTOs, fetching necessary related entities for DTO fields
+        return documents.stream()
+                .map(doc -> mapToMyDocumentCardResponseDto(doc, currentUser))
+                .collect(Collectors.toList());
+    }
+
+    // Helper method to map Document entity to DocumentCardDto
+    private DocumentCardDto mapToDocumentCardDto(Document document, User currentUser) {
+        // Fetch associated category name
+        String categoryName = Optional.ofNullable(document.getCategory())
+                .map(Category::getName)
+                .orElse("Uncategorized");
+
+        // Fetch author name
+        String authorName = Optional.ofNullable(document.getCreatedBy())
+                .map(User::getFullName)
+                .orElse("Unknown Author");
+
+        // Fetch tag names
+        List<String> tagNames = document.getDocumentTags().stream()
+                .map(dt -> dt.getTag().getName())
+                .collect(Collectors.toList());
+
+        return DocumentCardDto.builder()
+                .id(document.getId().toString())
+                .title(document.getTitle())
+                .slug(document.getSlug())
+                .description(document.getDescription())
+                .thumbnailUrl(document.getThumbnailUrl())
+                .fileName(document.getFileName())
+                .fileType(document.getFileType() != null ? document.getFileType().name() : "OTHER") // Use enum name
+                .fileSize(document.getFileSize())
+                .status(document.getStatus())
+                .uploadDate(document.getCreatedAt()) // Using createdAt as uploadDate
+                .views(document.getViewCount())
+                .downloads(document.getDownloadCount())
+                .bookmarks(document.getBookmarkCount())
+                .build();
+    }
+
+    // Helper method to map Document entity to MyDocumentCardResponseDto
+    private MyDocumentCardResponseDto mapToMyDocumentCardResponseDto(Document document, User currentUser) {
+        // Fetch associated category name
+        String categoryName = Optional.ofNullable(document.getCategory())
+                .map(Category::getName)
+                .orElse("Uncategorized");
+
+        // Fetch author name
+        String authorName = Optional.ofNullable(document.getCreatedBy())
+                .map(User::getFullName)
+                .orElse("Unknown Author");
+
+        // Fetch tag names
+        List<String> tagNames = document.getDocumentTags().stream()
+                .map(dt -> dt.getTag().getName())
+                .collect(Collectors.toList());
+
+        return MyDocumentCardResponseDto.builder()
+                .id(document.getId().toString())
+                .title(document.getTitle())
+                .thumbnailUrl(document.getThumbnailUrl())
+                .categoryName(categoryName)
+                .authorName(authorName)
+                .createdAt(document.getCreatedAt())
+                .status(document.getStatus())
+                .fileType(document.getFileType() != null ? document.getFileType().name() : "OTHER")
+                .fileName(document.getFileName())
+                .fileSizeBytes(document.getFileSize())
+                .tags(tagNames)
+                .documentUrl(document.getFileUrl())
+                .build();
     }
 }

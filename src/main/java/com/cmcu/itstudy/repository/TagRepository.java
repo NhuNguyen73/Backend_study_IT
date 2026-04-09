@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface TagRepository extends JpaRepository<Tag, UUID> {
@@ -27,4 +28,6 @@ public interface TagRepository extends JpaRepository<Tag, UUID> {
             order by count(dt) desc, t.name asc
             """)
     List<Tag> findTop15PopularTags(Pageable pageable);
+
+    Optional<Tag> findByName(String name);
 }
