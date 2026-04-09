@@ -11,11 +11,15 @@ import com.cmcu.itstudy.dto.document.DocumentFileUrlResponseDto;
 import com.cmcu.itstudy.dto.document.DocumentPrimaryFileDto;
 import com.cmcu.itstudy.dto.document.DocumentRelatedDocumentDto;
 import com.cmcu.itstudy.dto.document.FileTypeDto;
+import com.cmcu.itstudy.dto.document.QuizListItemDto;
+import com.cmcu.itstudy.dto.document.QuizListPageResponseDto;
 import com.cmcu.itstudy.entity.Document;
 import com.cmcu.itstudy.entity.DocumentComment;
 import com.cmcu.itstudy.entity.DocumentFile;
+import com.cmcu.itstudy.entity.DocumentQuiz;
 import com.cmcu.itstudy.entity.Quiz;
 import com.cmcu.itstudy.enums.FileType;
+import org.springframework.data.domain.Page;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -136,7 +140,39 @@ public final class DocumentMapper {
                 .id(uuidToString(quiz.getId()))
                 .title(quiz.getTitle())
                 .totalQuestions(totalQuestions)
-                .duration(quiz.getDurationMinutes())
+                .durationMinutes(quiz.getDurationMinutes())
+                .passScorePercent(quiz.getPassScorePercent())
+                .build();
+    }
+
+    public static QuizListItemDto toQuizListItemDto(Quiz quiz, long totalQuestions) {
+        if (quiz == null) {
+            return null;
+        }
+        return QuizListItemDto.builder()
+                .quizId(uuidToString(quiz.getId()))
+                .title(quiz.getTitle())
+                .description(quiz.getDescription())
+                .totalQuestions(totalQuestions)
+                .durationMinutes(quiz.getDurationMinutes())
+                .passScorePercent(quiz.getPassScorePercent())
+                .build();
+    }
+
+    public static QuizListPageResponseDto toQuizListPageResponseDto(Page<DocumentQuiz> linkPage, Map<UUID, Long> counts) {
+        if (linkPage == null) {
+            return null;
+        }
+        List<QuizListItemDto> items = linkPage.getContent().stream()
+                .map(DocumentQuiz::getQuiz)
+                .filter(q -> q != null && q.getId() != null)
+                .map(q -> toQuizListItemDto(q, counts.getOrDefault(q.getId(), 0L)))
+                .toList();
+        return QuizListPageResponseDto.builder()
+                .items(items)
+                .page(linkPage.getNumber())
+                .totalPages(linkPage.getTotalPages())
+                .totalItems(linkPage.getTotalElements())
                 .build();
     }
 

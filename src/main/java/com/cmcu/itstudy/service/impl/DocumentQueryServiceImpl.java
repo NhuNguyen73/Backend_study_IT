@@ -6,6 +6,7 @@ import com.cmcu.itstudy.dto.document.DocumentDetailResponseDto;
 import com.cmcu.itstudy.dto.document.DocumentFileUrlResponseDto;
 import com.cmcu.itstudy.dto.document.DocumentPrimaryFileDto;
 import com.cmcu.itstudy.dto.document.DocumentRelatedDocumentDto;
+import com.cmcu.itstudy.dto.document.QuizListPageResponseDto;
 import com.cmcu.itstudy.entity.Document;
 import com.cmcu.itstudy.mapper.DocumentMapper;
 import com.cmcu.itstudy.repository.DocumentDownloadRepository;
@@ -101,5 +102,11 @@ public class DocumentQueryServiceImpl implements DocumentQueryService {
         return documentFileRepository.findByDocumentIdAndPrimaryTrue(documentId)
                 .map(DocumentMapper::toFileUrlResponseDto)
                 .orElseThrow(() -> new NoSuchElementException("Primary document file not found"));
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public QuizListPageResponseDto getQuizzesByDocument(UUID documentId, int page, int size) {
+        return quizService.getQuizzesByDocument(documentId, page, size);
     }
 }

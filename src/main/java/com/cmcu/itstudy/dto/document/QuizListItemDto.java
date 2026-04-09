@@ -11,9 +11,11 @@ import lombok.Setter;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class DocumentDetailQuizDto {
-    private String id;
+public class QuizListItemDto {
+
+    private String quizId;
     private String title;
+    private String description;
     private Long totalQuestions;
     private Integer durationMinutes;
     private Double passScorePercent;

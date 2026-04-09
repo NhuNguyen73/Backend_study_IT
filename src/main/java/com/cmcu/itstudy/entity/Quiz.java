@@ -43,8 +43,17 @@ public class Quiz {
     @Column(name = "title", nullable = false, length = 255)
     private String title;
 
+    @Column(name = "description", columnDefinition = "NVARCHAR(MAX)")
+    private String description;
+
     @Column(name = "duration_minutes", nullable = false)
     private Integer durationMinutes;
+
+    @Column(name = "max_attempts_per_day", nullable = false)
+    private Integer maxAttemptsPerDay;
+
+    @Column(name = "pass_score_percent", nullable = false)
+    private Double passScorePercent;
 
     @Column(name = "is_published", nullable = false)
     private Boolean published;
@@ -64,11 +73,23 @@ public class Quiz {
     @Builder.Default
     private List<DocumentQuiz> documentQuizzes = new ArrayList<>();
 
+    @OneToMany(mappedBy = "quiz", fetch = FetchType.LAZY)
+    @ToString.Exclude
+    @JsonIgnore
+    @Builder.Default
+    private List<QuizAttempt> attempts = new ArrayList<>();
+
     @PrePersist
     void prePersist() {
         this.createdAt = LocalDateTime.now();
         if (this.published == null) {
             this.published = Boolean.FALSE;
+        }
+        if (this.maxAttemptsPerDay == null) {
+            this.maxAttemptsPerDay = 3;
+        }
+        if (this.passScorePercent == null) {
+            this.passScorePercent = 80.0d;
         }
     }
 }

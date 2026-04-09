@@ -18,4 +18,13 @@ public interface QuizQuestionRepository extends JpaRepository<QuizQuestion, UUID
             group by qq.quiz.id
             """)
     List<Object[]> countQuestionsGroupedByQuizId(@Param("quizIds") Collection<UUID> quizIds);
+
+    @Query("""
+            select distinct qq
+            from QuizQuestion qq
+            left join fetch qq.options qo
+            where qq.quiz.id = :quizId
+            order by qq.sortOrder asc, qo.sortOrder asc
+            """)
+    List<QuizQuestion> findAllByQuizIdWithOptions(@Param("quizId") UUID quizId);
 }

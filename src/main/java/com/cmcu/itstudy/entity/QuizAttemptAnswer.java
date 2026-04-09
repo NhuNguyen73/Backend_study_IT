@@ -9,7 +9,6 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
-import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -19,8 +18,6 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 import lombok.ToString;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.UUID;
 
 @Getter
@@ -31,8 +28,8 @@ import java.util.UUID;
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @ToString
 @Entity
-@Table(name = "tbl_quiz_questions")
-public class QuizQuestion {
+@Table(name = "tbl_quiz_attempt_answers")
+public class QuizAttemptAnswer {
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
@@ -41,33 +38,23 @@ public class QuizQuestion {
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "quiz_id", nullable = false)
+    @JoinColumn(name = "attempt_id", nullable = false)
     @ToString.Exclude
     @JsonIgnore
-    private Quiz quiz;
+    private QuizAttempt attempt;
 
-    @Column(name = "sort_order", nullable = false)
-    private Integer sortOrder;
-
-    @Column(name = "question_text", nullable = false, columnDefinition = "nvarchar(max)")
-    private String questionText;
-
-    @Column(name = "explanation", columnDefinition = "NVARCHAR(MAX)")
-    private String explanation;
-
-    @Column(name = "points", nullable = false)
-    @Builder.Default
-    private Integer points = 1;
-
-    @OneToMany(mappedBy = "question", fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "question_id", nullable = false)
     @ToString.Exclude
     @JsonIgnore
-    @Builder.Default
-    private List<QuizQuestionOption> options = new ArrayList<>();
+    private QuizQuestion question;
 
-    @OneToMany(mappedBy = "question", fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "selected_option_id")
     @ToString.Exclude
     @JsonIgnore
-    @Builder.Default
-    private List<QuizAttemptAnswer> attemptAnswers = new ArrayList<>();
+    private QuizQuestionOption selectedOption;
+
+    @Column(name = "is_correct")
+    private Boolean isCorrect;
 }

@@ -6,15 +6,17 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.util.List;
+
 @Getter
 @Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class DocumentDetailQuizDto {
-    private String id;
-    private String title;
-    private Long totalQuestions;
-    private Integer durationMinutes;
-    private Double passScorePercent;
+public class QuizListPageResponseDto {
+
+    private List<QuizListItemDto> items;
+    private Integer page;
+    private Integer totalPages;
+    private Long totalItems;
 }

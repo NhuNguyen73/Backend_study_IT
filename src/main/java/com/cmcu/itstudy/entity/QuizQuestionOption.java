@@ -31,8 +31,8 @@ import java.util.UUID;
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @ToString
 @Entity
-@Table(name = "tbl_quiz_questions")
-public class QuizQuestion {
+@Table(name = "tbl_quiz_question_options")
+public class QuizQuestionOption {
 
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
@@ -41,31 +41,22 @@ public class QuizQuestion {
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "quiz_id", nullable = false)
+    @JoinColumn(name = "question_id", nullable = false)
     @ToString.Exclude
     @JsonIgnore
-    private Quiz quiz;
+    private QuizQuestion question;
+
+    @Column(name = "content", nullable = false, columnDefinition = "NVARCHAR(MAX)")
+    private String content;
+
+    @Column(name = "is_correct", nullable = false)
+    @Builder.Default
+    private Boolean isCorrect = Boolean.FALSE;
 
     @Column(name = "sort_order", nullable = false)
     private Integer sortOrder;
 
-    @Column(name = "question_text", nullable = false, columnDefinition = "nvarchar(max)")
-    private String questionText;
-
-    @Column(name = "explanation", columnDefinition = "NVARCHAR(MAX)")
-    private String explanation;
-
-    @Column(name = "points", nullable = false)
-    @Builder.Default
-    private Integer points = 1;
-
-    @OneToMany(mappedBy = "question", fetch = FetchType.LAZY)
-    @ToString.Exclude
-    @JsonIgnore
-    @Builder.Default
-    private List<QuizQuestionOption> options = new ArrayList<>();
-
-    @OneToMany(mappedBy = "question", fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "selectedOption", fetch = FetchType.LAZY)
     @ToString.Exclude
     @JsonIgnore
     @Builder.Default
