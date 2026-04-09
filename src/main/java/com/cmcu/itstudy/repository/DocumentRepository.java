@@ -8,6 +8,7 @@ import org.springframework.data.domain.Slice;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
@@ -130,4 +131,7 @@ public interface DocumentRepository extends JpaRepository<Document, UUID>, JpaSp
                                                   @Param("categoryId") UUID categoryId,
                                                   @Param("excludeDocumentId") UUID excludeDocumentId,
                                                   Pageable pageable);
+
+    @EntityGraph(attributePaths = {"category", "createdBy", "documentTags.tag"})
+    List<Document> findByCreatedByAndDeletedFalseOrderByCreatedAtDesc(com.cmcu.itstudy.entity.User createdBy);
 }
