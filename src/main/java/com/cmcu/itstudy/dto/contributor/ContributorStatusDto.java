@@ -17,4 +17,5 @@ public class ContributorStatusDto {
     private String rejectionReason;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
+    private int submissionCount;
 }

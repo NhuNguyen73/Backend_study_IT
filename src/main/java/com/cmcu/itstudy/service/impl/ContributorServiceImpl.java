@@ -39,21 +39,62 @@ public class ContributorServiceImpl implements ContributorService {
             throw new RuntimeException("Bạn đã có một yêu cầu đang chờ duyệt.");
         }
 
-        ContributorRequest contributorRequest = ContributorRequest.builder()
-                .user(user)
-                .portfolioLink(request.getPortfolioLink())
-                .experience(request.getExperience())
-                .status(ContributorRequestStatus.PENDING)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
+        Optional<ContributorRequest> latestOpt = contributorRequestRepository.findFirstByUserOrderByCreatedAtDesc(user);
+        LocalDateTime now = LocalDateTime.now();
 
+        if (latestOpt.isEmpty()) {
+            ContributorRequest contributorRequest = ContributorRequest.builder()
+                    .user(user)
+                    .portfolioLink(request.getPortfolioLink())
+                    .experience(request.getExperience())
+                    .status(ContributorRequestStatus.PENDING)
+                    .submissionCount(1)
+                    .createdAt(now)
+                    .updatedAt(now)
+                    .build();
+            applyCertificates(contributorRequest, request);
+            contributorRequestRepository.save(contributorRequest);
+            return;
+        }
 
+        ContributorRequest latest = latestOpt.get();
+        ContributorRequestStatus st = latest.getStatus();
+
+        if (st == ContributorRequestStatus.APPROVED) {
+            throw new RuntimeException("Yêu cầu Contributor của bạn đã được phê duyệt.");
+        }
+
+        if (st == ContributorRequestStatus.REJECTED || st == ContributorRequestStatus.NEED_INFO) {
+            if (latest.getSubmissionCount() >= 2) {
+                throw new RuntimeException("Bạn đã hết số lần gửi yêu cầu Contributor.");
+            }
+            if (latest.getSubmissionCount() == 1) {
+                latest.setSubmissionCount(2);
+                latest.setStatus(ContributorRequestStatus.PENDING);
+                latest.setRejectionReason(null);
+                latest.setPortfolioLink(request.getPortfolioLink());
+                latest.setExperience(request.getExperience());
+                latest.setUpdatedAt(now);
+                applyCertificates(latest, request);
+                contributorRequestRepository.save(latest);
+                return;
+            }
+            throw new RuntimeException("Dữ liệu hồ sơ không hợp lệ. Vui lòng liên hệ hỗ trợ.");
+        }
+
+        throw new RuntimeException("Bạn đã có một yêu cầu đang chờ duyệt.");
+    }
+
+    private void applyCertificates(ContributorRequest contributorRequest, ContributorRegistrationRequestDto request) {
         if (!request.getCertificates().isEmpty()) {
             contributorRequest.setCertificateName(request.getCertificates().get(0).getCertificateName());
             contributorRequest.setCertificateUrl(request.getCertificates().get(0).getUrl());
+        } else {
+            contributorRequest.setCertificateName(null);
+            contributorRequest.setCertificateUrl(null);
         }
 
+        contributorRequest.getCertificates().clear();
         List<ContributorCertificate> certificates = request.getCertificates().stream()
                 .map(certDto -> ContributorCertificate.builder()
                         .request(contributorRequest)
@@ -61,9 +102,7 @@ public class ContributorServiceImpl implements ContributorService {
                         .certificateName(certDto.getCertificateName())
                         .build())
                 .collect(Collectors.toList());
-
-        contributorRequest.setCertificates(certificates);
-        contributorRequestRepository.save(contributorRequest);
+        contributorRequest.getCertificates().addAll(certificates);
     }
 
     @Override
@@ -83,6 +122,7 @@ public class ContributorServiceImpl implements ContributorService {
                 .rejectionReason(request.getRejectionReason())
                 .createdAt(request.getCreatedAt())
                 .updatedAt(request.getUpdatedAt())
+                .submissionCount(request.getSubmissionCount())
                 .build();
     }
 }

@@ -62,6 +62,11 @@ public class ContributorRequest {
     @Column(name = "rejection_reason", length = 1000)
     private String rejectionReason;
 
+    /** Số lần đã gửi hồ sơ (tối đa 2). */
+    @Column(name = "submission_count", nullable = false)
+    @Builder.Default
+    private int submissionCount = 1;
+
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
