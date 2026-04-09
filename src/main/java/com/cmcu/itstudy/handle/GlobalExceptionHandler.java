@@ -73,6 +73,13 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(status).body(body);
     }
 
+    @ExceptionHandler(QuizAlreadySubmittedException.class)
+    public ResponseEntity<ApiResponse<Void>> handleQuizAlreadySubmitted(QuizAlreadySubmittedException ex) {
+        String message = ex.getMessage() != null ? ex.getMessage() : "Attempt already submitted";
+        ApiResponse<Void> body = ApiResponse.failure(message);
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGenericException(Exception ex) {
         // Log ex internally (e.g., using a logger) but don't expose details.

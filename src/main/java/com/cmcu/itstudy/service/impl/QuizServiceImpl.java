@@ -15,6 +15,7 @@ import com.cmcu.itstudy.entity.QuizAttempt;
 import com.cmcu.itstudy.entity.QuizAttemptAnswer;
 import com.cmcu.itstudy.entity.QuizQuestion;
 import com.cmcu.itstudy.entity.QuizQuestionOption;
+import com.cmcu.itstudy.handle.QuizAlreadySubmittedException;
 import com.cmcu.itstudy.mapper.DocumentMapper;
 import com.cmcu.itstudy.mapper.QuizMapper;
 import com.cmcu.itstudy.repository.DocumentRepository;
@@ -29,14 +30,19 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -49,6 +55,7 @@ import java.util.stream.Collectors;
 public class QuizServiceImpl implements QuizService {
 
     private static final int PREVIEW_HISTORY_LIMIT = 5;
+    private static final Logger log = LoggerFactory.getLogger(QuizServiceImpl.class);
 
     private final DocumentQuizRepository documentQuizRepository;
     private final QuizQuestionRepository quizQuestionRepository;
@@ -127,11 +134,16 @@ public class QuizServiceImpl implements QuizService {
     }
 
     @Override
-    @Transactional
+    @Transactional(isolation = Isolation.SERIALIZABLE)
     public StartQuizResponseDto startQuiz(UUID quizId) {
         UUID userId = getCurrentUserId();
         Quiz quiz = quizRepository.findById(quizId)
                 .orElseThrow(() -> new NoSuchElementException("Quiz not found"));
+
+        QuizAttempt inProgressAttempt = findLatestInProgressAttemptForStart(userId, quizId);
+        if (inProgressAttempt != null) {
+            return toStartQuizResponseDto(inProgressAttempt, quiz);
+        }
 
         LocalDateTime now = LocalDateTime.now();
         LocalDate today = now.toLocalDate();
@@ -157,86 +169,98 @@ public class QuizServiceImpl implements QuizService {
                 .startTime(now)
                 .status("IN_PROGRESS")
                 .build();
-        QuizAttempt saved = quizAttemptRepository.save(attempt);
-
-        return StartQuizResponseDto.builder()
-                .attemptId(saved.getId().toString())
-                .startTime(saved.getStartTime())
-                .durationMinutes(quiz.getDurationMinutes())
-                .build();
+        try {
+            QuizAttempt saved = quizAttemptRepository.saveAndFlush(attempt);
+            return toStartQuizResponseDto(saved, quiz);
+        } catch (DataIntegrityViolationException ex) {
+            // Unique constraint race fallback: if another request created IN_PROGRESS first, return that one.
+            QuizAttempt existing = findLatestInProgressAttemptForStart(userId, quizId);
+            if (existing != null) {
+                return toStartQuizResponseDto(existing, quiz);
+            }
+            throw ex;
+        }
     }
 
     @Override
     @Transactional
     public QuizResultResponseDto submitQuiz(SubmitQuizRequestDto request) {
-        UUID userId = getCurrentUserId();
-        UUID attemptId = parseUuid(request != null ? request.getAttemptId() : null, "Invalid attemptId");
+        try {
+            UUID userId = getCurrentUserId();
+            UUID attemptId = parseUuid(request != null ? request.getAttemptId() : null, "Invalid attemptId");
 
-        QuizAttempt attempt = quizAttemptRepository.findById(attemptId)
-                .orElseThrow(() -> new NoSuchElementException("Attempt not found"));
-        validateAttemptOwner(attempt, userId);
-        if (attempt.getEndTime() != null || !"IN_PROGRESS".equalsIgnoreCase(attempt.getStatus())) {
-            throw new IllegalArgumentException("Attempt already submitted");
-        }
-
-        Quiz quiz = attempt.getQuiz();
-        if (quiz == null || quiz.getId() == null) {
-            throw new NoSuchElementException("Quiz not found");
-        }
-
-        List<QuizQuestion> questions = quizQuestionRepository.findAllByQuizIdWithOptions(quiz.getId());
-        Map<UUID, QuizQuestionOption> selectedByQuestionId = resolveSelectedOptions(questions, request);
-
-        int totalQuestions = questions.size();
-        int correctCount = 0;
-        int wrongCount = 0;
-        int skippedCount = 0;
-        double score = 0d;
-        double maxScore = 0d;
-
-        List<QuizAttemptAnswer> answersToSave = new java.util.ArrayList<>(questions.size());
-        for (QuizQuestion question : questions) {
-            int points = question.getPoints() != null ? question.getPoints() : 1;
-            maxScore += points;
-
-            QuizQuestionOption selected = selectedByQuestionId.get(question.getId());
-            Boolean isCorrect;
-            if (selected == null) {
-                skippedCount++;
-                isCorrect = Boolean.FALSE;
-            } else if (Boolean.TRUE.equals(selected.getIsCorrect())) {
-                correctCount++;
-                score += points;
-                isCorrect = Boolean.TRUE;
-            } else {
-                wrongCount++;
-                isCorrect = Boolean.FALSE;
+            QuizAttempt attempt = quizAttemptRepository.findByIdForUpdate(attemptId)
+                    .orElseThrow(() -> new NoSuchElementException("Attempt not found"));
+            validateAttemptOwner(attempt, userId);
+            if (attempt.getEndTime() != null) {
+                throw new QuizAlreadySubmittedException("Attempt already submitted");
+            }
+            if (!"IN_PROGRESS".equalsIgnoreCase(attempt.getStatus())) {
+                throw new QuizAlreadySubmittedException("Attempt is not in progress");
             }
 
-            answersToSave.add(QuizAttemptAnswer.builder()
-                    .attempt(attempt)
-                    .question(question)
-                    .selectedOption(selected)
-                    .isCorrect(isCorrect)
-                    .build());
+            Quiz quiz = attempt.getQuiz();
+            if (quiz == null || quiz.getId() == null) {
+                throw new NoSuchElementException("Quiz not found");
+            }
+
+            List<QuizQuestion> questions = quizQuestionRepository.findAllByQuizIdWithOptions(quiz.getId());
+            Map<UUID, QuizQuestionOption> selectedByQuestionId = resolveSelectedOptions(questions, request);
+
+            int totalQuestions = questions.size();
+            int correctCount = 0;
+            int wrongCount = 0;
+            int skippedCount = 0;
+            double score = 0d;
+            double maxScore = 0d;
+
+            List<QuizAttemptAnswer> answersToSave = new java.util.ArrayList<>(questions.size());
+            for (QuizQuestion question : questions) {
+                int points = question.getPoints() != null ? question.getPoints() : 1;
+                maxScore += points;
+
+                QuizQuestionOption selected = selectedByQuestionId.get(question.getId());
+                Boolean isCorrect;
+                if (selected == null) {
+                    skippedCount++;
+                    isCorrect = Boolean.FALSE;
+                } else if (Boolean.TRUE.equals(selected.getIsCorrect())) {
+                    correctCount++;
+                    score += points;
+                    isCorrect = Boolean.TRUE;
+                } else {
+                    wrongCount++;
+                    isCorrect = Boolean.FALSE;
+                }
+
+                answersToSave.add(QuizAttemptAnswer.builder()
+                        .attempt(attempt)
+                        .question(question)
+                        .selectedOption(selected)
+                        .isCorrect(isCorrect)
+                        .build());
+            }
+
+            quizAttemptAnswerRepository.saveAll(answersToSave);
+            attempt.setAnswers(answersToSave);
+            attempt.setTotalQuestions(totalQuestions);
+            attempt.setCorrectCount(correctCount);
+            attempt.setWrongCount(wrongCount);
+            attempt.setSkippedCount(skippedCount);
+            attempt.setScore(score);
+            attempt.setMaxScore(maxScore);
+            double scorePercent = maxScore > 0 ? (score * 100d / maxScore) : 0d;
+            attempt.setScorePercent(scorePercent);
+            attempt.setEndTime(LocalDateTime.now());
+            double passScorePercent = quiz.getPassScorePercent() != null ? quiz.getPassScorePercent() : 80.0d;
+            attempt.setStatus(scorePercent >= passScorePercent ? "PASSED" : "FAILED");
+            QuizAttempt saved = quizAttemptRepository.save(attempt);
+
+            return QuizMapper.toQuizResultResponseDto(saved);
+        } catch (Exception e) {
+            log.error("Submit quiz error", e);
+            throw e;
         }
-
-        quizAttemptAnswerRepository.saveAll(answersToSave);
-        attempt.setAnswers(answersToSave);
-        attempt.setTotalQuestions(totalQuestions);
-        attempt.setCorrectCount(correctCount);
-        attempt.setWrongCount(wrongCount);
-        attempt.setSkippedCount(skippedCount);
-        attempt.setScore(score);
-        attempt.setMaxScore(maxScore);
-        double scorePercent = maxScore > 0 ? (score * 100d / maxScore) : 0d;
-        attempt.setScorePercent(scorePercent);
-        attempt.setEndTime(LocalDateTime.now());
-        double passScorePercent = quiz.getPassScorePercent() != null ? quiz.getPassScorePercent() : 80.0d;
-        attempt.setStatus(scorePercent >= passScorePercent ? "PASSED" : "FAILED");
-        QuizAttempt saved = quizAttemptRepository.save(attempt);
-
-        return QuizMapper.toQuizResultResponseDto(saved);
     }
 
     @Override
@@ -279,13 +303,17 @@ public class QuizServiceImpl implements QuizService {
                 .map(QuizMapper::toQuizHistoryItemDto)
                 .collect(Collectors.toList());
 
+        List<QuizQuestion> questionEntities = quizQuestionRepository.findAllByQuizIdWithOptions(quizId);
+
         return QuizPreviewResponseDto.builder()
                 .quizId(quiz.getId() != null ? quiz.getId().toString() : null)
                 .quizTitle(quiz.getTitle())
+                .description(quiz.getDescription())
                 .totalQuestions(totalQuestions)
                 .duration(quiz.getDurationMinutes())
                 .passScorePercent(quiz.getPassScorePercent())
                 .recentAttempts(recentAttempts)
+                .questions(QuizMapper.toPreviewQuestionDtos(questionEntities))
                 .build();
     }
 
@@ -296,15 +324,26 @@ public class QuizServiceImpl implements QuizService {
                 .collect(Collectors.toMap(QuizQuestion::getId, q -> q));
 
         Map<UUID, QuizQuestionOption> selectedByQuestionId = new HashMap<>();
+        HashSet<UUID> submittedQuestionIds = new HashSet<>();
         if (request == null || request.getAnswers() == null) {
             return selectedByQuestionId;
         }
 
         for (SubmitQuizAnswerRequestDto answer : request.getAnswers()) {
-            UUID questionId = parseUuid(answer != null ? answer.getQuestionId() : null, "Invalid questionId");
+            if (answer == null) {
+                continue;
+            }
+            String questionIdRaw = answer.getQuestionId();
+            if (questionIdRaw == null || questionIdRaw.isBlank()) {
+                continue;
+            }
+            UUID questionId = parseUuid(questionIdRaw, "Invalid questionId");
             QuizQuestion question = questionMap.get(questionId);
             if (question == null) {
                 throw new IllegalArgumentException("Question does not belong to quiz");
+            }
+            if (!submittedQuestionIds.add(questionId)) {
+                throw new IllegalArgumentException("Duplicate questionId in answers");
             }
 
             String optionIdRaw = answer.getSelectedOptionId();
@@ -321,6 +360,22 @@ public class QuizServiceImpl implements QuizService {
             selectedByQuestionId.put(questionId, selectedOption);
         }
         return selectedByQuestionId;
+    }
+
+    private QuizAttempt findLatestInProgressAttemptForStart(UUID userId, UUID quizId) {
+        List<QuizAttempt> inProgressAttempts = quizAttemptRepository.findInProgressAttemptsForUpdate(userId, quizId);
+        if (inProgressAttempts == null || inProgressAttempts.isEmpty()) {
+            return null;
+        }
+        return inProgressAttempts.get(0);
+    }
+
+    private StartQuizResponseDto toStartQuizResponseDto(QuizAttempt attempt, Quiz quiz) {
+        return StartQuizResponseDto.builder()
+                .attemptId(attempt.getId().toString())
+                .startTime(attempt.getStartTime())
+                .durationMinutes(quiz.getDurationMinutes())
+                .build();
     }
 
     private void validateAttemptOwner(QuizAttempt attempt, UUID userId) {

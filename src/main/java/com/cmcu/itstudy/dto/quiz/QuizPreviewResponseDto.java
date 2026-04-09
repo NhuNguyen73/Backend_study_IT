@@ -17,8 +17,11 @@ public class QuizPreviewResponseDto {
 
     private String quizId;
     private String quizTitle;
+    private String description;
     private Long totalQuestions;
     private Integer duration;
     private Double passScorePercent;
     private List<QuizHistoryItemDto> recentAttempts;
+    /** Câu hỏi + đáp án (không lộ đúng/sai) — dùng cho màn làm bài. */
+    private List<QuizPreviewQuestionDto> questions;
 }

@@ -2,6 +2,8 @@ package com.cmcu.itstudy.mapper;
 
 import com.cmcu.itstudy.dto.quiz.QuizHistoryItemDto;
 import com.cmcu.itstudy.dto.quiz.QuizHistoryPageResponseDto;
+import com.cmcu.itstudy.dto.quiz.QuizPreviewOptionDto;
+import com.cmcu.itstudy.dto.quiz.QuizPreviewQuestionDto;
 import com.cmcu.itstudy.dto.quiz.QuizResultOptionDto;
 import com.cmcu.itstudy.dto.quiz.QuizResultQuestionDto;
 import com.cmcu.itstudy.dto.quiz.QuizResultResponseDto;
@@ -75,6 +77,42 @@ public final class QuizMapper {
                 .build();
     }
 
+    public static List<QuizPreviewQuestionDto> toPreviewQuestionDtos(List<QuizQuestion> questions) {
+        if (questions == null || questions.isEmpty()) {
+            return Collections.emptyList();
+        }
+        List<QuizQuestion> sorted = new ArrayList<>(questions);
+        sorted.sort(Comparator.comparing(QuizQuestion::getSortOrder, Comparator.nullsLast(Integer::compareTo)));
+
+        List<QuizPreviewQuestionDto> out = new ArrayList<>(sorted.size());
+        for (QuizQuestion q : sorted) {
+            if (q == null) {
+                continue;
+            }
+            List<QuizPreviewOptionDto> opts = new ArrayList<>();
+            if (q.getOptions() != null && !q.getOptions().isEmpty()) {
+                List<QuizQuestionOption> sortedOpts = new ArrayList<>(q.getOptions());
+                sortedOpts.sort(Comparator.comparing(QuizQuestionOption::getSortOrder, Comparator.nullsLast(Integer::compareTo)));
+                for (QuizQuestionOption o : sortedOpts) {
+                    if (o == null) {
+                        continue;
+                    }
+                    opts.add(QuizPreviewOptionDto.builder()
+                            .id(uuidToString(o.getId()))
+                            .content(o.getContent())
+                            .build());
+                }
+            }
+            out.add(QuizPreviewQuestionDto.builder()
+                    .questionId(uuidToString(q.getId()))
+                    .questionText(q.getQuestionText())
+                    .sortOrder(q.getSortOrder())
+                    .options(opts)
+                    .build());
+        }
+        return out;
+    }
+
     private static List<QuizResultQuestionDto> toResultQuestionDtos(List<QuizAttemptAnswer> attemptAnswers) {
         if (attemptAnswers == null || attemptAnswers.isEmpty()) {
             return Collections.emptyList();
@@ -128,11 +166,12 @@ public final class QuizMapper {
                 continue;
             }
             UUID optionId = option.getId();
+            boolean isSelected = selectedOptionId != null && Objects.equals(optionId, selectedOptionId);
             result.add(QuizResultOptionDto.builder()
                     .answerId(uuidToString(optionId))
                     .content(option.getContent())
                     .isCorrect(option.getIsCorrect())
-                    .isSelected(Objects.equals(optionId, selectedOptionId))
+                    .isSelected(isSelected)
                     .build());
         }
         return result;

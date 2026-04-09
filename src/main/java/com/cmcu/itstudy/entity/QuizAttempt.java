@@ -11,6 +11,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -82,6 +83,10 @@ public class QuizAttempt {
 
     @Column(name = "skipped_count")
     private Integer skippedCount;
+
+    @Version
+    @Column(name = "version")
+    private Long version;
 
     @OneToMany(mappedBy = "attempt", fetch = FetchType.LAZY)
     @ToString.Exclude

@@ -10,6 +10,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.EqualsAndHashCode;
@@ -28,7 +29,12 @@ import java.util.UUID;
 @EqualsAndHashCode(onlyExplicitlyIncluded = true)
 @ToString
 @Entity
-@Table(name = "tbl_quiz_attempt_answers")
+@Table(
+        name = "tbl_quiz_attempt_answers",
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uq_quiz_attempt_question", columnNames = {"attempt_id", "question_id"})
+        }
+)
 public class QuizAttemptAnswer {
 
     @Id
