@@ -3,6 +3,7 @@ package com.cmcu.itstudy.service.contract;
 import com.cmcu.itstudy.dto.document.DocumentCardDto;
 import com.cmcu.itstudy.dto.document.DocumentCreateRequestDto;
 import com.cmcu.itstudy.dto.document.DocumentUpdateRequestDto;
+import com.cmcu.itstudy.dto.document.MyDocumentCardResponseDto;
 import com.cmcu.itstudy.entity.Document;
 import com.cmcu.itstudy.entity.User;
 
@@ -21,5 +22,5 @@ public interface DocumentService {
 
     void deleteDocument(UUID documentId, User currentUser);
 
-    List<DocumentCardDto> getMyDocuments(User currentUser);
+    List<MyDocumentCardResponseDto> getMyDocuments(User currentUser);
 }

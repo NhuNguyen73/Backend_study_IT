@@ -251,17 +251,17 @@ public class DocumentServiceImpl implements DocumentService {
         documentRepository.save(document);
     }
 
-    @Transactional(readOnly = true)
-    @Override
-    public List<MyDocumentCardResponseDto> getMyDocuments(User currentUser) {
-        // Fetch documents created by the current user, not deleted, ordered by creation date
-        List<Document> documents = documentRepository.findByCreatedByAndDeletedFalseOrderByCreatedAtDesc(currentUser);
+        @Transactional(readOnly = true)
+        @Override
+        public List<MyDocumentCardResponseDto> getMyDocuments(User currentUser) {
+            // Fetch documents created by the current user, not deleted, ordered by creation date
+            List<Document> documents = documentRepository.findByCreatedByAndDeletedFalseOrderByCreatedAtDesc(currentUser);
 
-        // Map to DTOs, fetching necessary related entities for DTO fields
-        return documents.stream()
-                .map(doc -> mapToMyDocumentCardResponseDto(doc, currentUser))
-                .collect(Collectors.toList());
-    }
+            // Map to DTOs, fetching necessary related entities for DTO fields
+            return documents.stream()
+                    .map(doc -> mapToMyDocumentCardResponseDto(doc, currentUser))
+                    .collect(Collectors.toList());
+        }
 
     // Helper method to map Document entity to DocumentCardDto
     private DocumentCardDto mapToDocumentCardDto(Document document, User currentUser) {
