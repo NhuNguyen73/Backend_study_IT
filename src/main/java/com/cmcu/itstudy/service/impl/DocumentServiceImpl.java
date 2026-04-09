@@ -3,7 +3,6 @@ package com.cmcu.itstudy.service.impl;
 import com.cmcu.itstudy.dto.document.DocumentCardDto;
 import com.cmcu.itstudy.dto.document.DocumentCreateRequestDto;
 import com.cmcu.itstudy.dto.document.DocumentUpdateRequestDto;
-import com.cmcu.itstudy.dto.document.MyDocumentCardResponseDto;
 import com.cmcu.itstudy.entity.*;
 import com.cmcu.itstudy.enums.DocumentStatus;
 import com.cmcu.itstudy.enums.FileType;
@@ -20,7 +19,6 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
-import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -30,23 +28,17 @@ public class DocumentServiceImpl implements DocumentService {
 
     private final DocumentRepository documentRepository;
     private final DocumentTagRepository documentTagRepository;
-    private final DocumentAuthorRepository documentAuthorRepository; // Assuming this exists for mapping authors if needed beyond createdBy
     private final CategoryRepository categoryRepository;
     private final TagRepository tagRepository;
-    private final UserRepository userRepository; // To fetch user details like author name
 
     public DocumentServiceImpl(DocumentRepository documentRepository,
                                DocumentTagRepository documentTagRepository,
                                CategoryRepository categoryRepository,
-                               TagRepository tagRepository,
-                               UserRepository userRepository,
-                               DocumentAuthorRepository documentAuthorRepository) { // Injecting dependencies
+                               TagRepository tagRepository) {
         this.documentRepository = documentRepository;
         this.documentTagRepository = documentTagRepository;
         this.categoryRepository = categoryRepository;
         this.tagRepository = tagRepository;
-        this.userRepository = userRepository;
-        this.documentAuthorRepository = documentAuthorRepository;
     }
 
     @Transactional(readOnly = true)
@@ -253,33 +245,18 @@ public class DocumentServiceImpl implements DocumentService {
 
     @Transactional(readOnly = true)
     @Override
-    public List<MyDocumentCardResponseDto> getMyDocuments(User currentUser) {
+    public List<DocumentCardDto> getMyDocuments(User currentUser) {
         // Fetch documents created by the current user, not deleted, ordered by creation date
         List<Document> documents = documentRepository.findByCreatedByAndDeletedFalseOrderByCreatedAtDesc(currentUser);
 
-        // Map to DTOs, fetching necessary related entities for DTO fields
+        // Map to card DTO for consistency with service contract
         return documents.stream()
-                .map(doc -> mapToMyDocumentCardResponseDto(doc, currentUser))
+                .map(doc -> mapToDocumentCardDto(doc, currentUser))
                 .collect(Collectors.toList());
     }
 
     // Helper method to map Document entity to DocumentCardDto
     private DocumentCardDto mapToDocumentCardDto(Document document, User currentUser) {
-        // Fetch associated category name
-        String categoryName = Optional.ofNullable(document.getCategory())
-                .map(Category::getName)
-                .orElse("Uncategorized");
-
-        // Fetch author name
-        String authorName = Optional.ofNullable(document.getCreatedBy())
-                .map(User::getFullName)
-                .orElse("Unknown Author");
-
-        // Fetch tag names
-        List<String> tagNames = document.getDocumentTags().stream()
-                .map(dt -> dt.getTag().getName())
-                .collect(Collectors.toList());
-
         return DocumentCardDto.builder()
                 .id(document.getId().toString())
                 .title(document.getTitle())
@@ -297,36 +274,4 @@ public class DocumentServiceImpl implements DocumentService {
                 .build();
     }
 
-    // Helper method to map Document entity to MyDocumentCardResponseDto
-    private MyDocumentCardResponseDto mapToMyDocumentCardResponseDto(Document document, User currentUser) {
-        // Fetch associated category name
-        String categoryName = Optional.ofNullable(document.getCategory())
-                .map(Category::getName)
-                .orElse("Uncategorized");
-
-        // Fetch author name
-        String authorName = Optional.ofNullable(document.getCreatedBy())
-                .map(User::getFullName)
-                .orElse("Unknown Author");
-
-        // Fetch tag names
-        List<String> tagNames = document.getDocumentTags().stream()
-                .map(dt -> dt.getTag().getName())
-                .collect(Collectors.toList());
-
-        return MyDocumentCardResponseDto.builder()
-                .id(document.getId().toString())
-                .title(document.getTitle())
-                .thumbnailUrl(document.getThumbnailUrl())
-                .categoryName(categoryName)
-                .authorName(authorName)
-                .createdAt(document.getCreatedAt())
-                .status(document.getStatus())
-                .fileType(document.getFileType() != null ? document.getFileType().name() : "OTHER")
-                .fileName(document.getFileName())
-                .fileSizeBytes(document.getFileSize())
-                .tags(tagNames)
-                .documentUrl(document.getFileUrl())
-                .build();
-    }
 }

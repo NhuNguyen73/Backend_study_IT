@@ -4,7 +4,6 @@ import com.cmcu.itstudy.dto.common.ApiResponse;
 import com.cmcu.itstudy.dto.document.DocumentCardDto;
 import com.cmcu.itstudy.dto.document.DocumentCreateRequestDto;
 import com.cmcu.itstudy.dto.document.DocumentUpdateRequestDto;
-import com.cmcu.itstudy.dto.document.MyDocumentCardResponseDto;
 import com.cmcu.itstudy.entity.User;
 import com.cmcu.itstudy.security.UserDetailsImpl;
 import com.cmcu.itstudy.service.contract.DocumentService;
@@ -28,10 +27,10 @@ public class MyDocumentController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<List<MyDocumentCardResponseDto>>> getMyDocuments(
+    public ResponseEntity<ApiResponse<List<DocumentCardDto>>> getMyDocuments(
             @AuthenticationPrincipal UserDetailsImpl currentUser) {
         User user = currentUser.getUser();
-        List<MyDocumentCardResponseDto> myDocuments = documentService.getMyDocuments(user);
+        List<DocumentCardDto> myDocuments = documentService.getMyDocuments(user);
         return ResponseEntity.ok(ApiResponse.success(myDocuments, "List of my documents"));
     }
 
