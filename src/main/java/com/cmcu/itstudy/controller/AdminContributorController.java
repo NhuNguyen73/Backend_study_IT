@@ -73,6 +73,7 @@ public class AdminContributorController {
 
                     return AdminContributorRequestDto.builder()
                         .id(req.getId())
+                        .userId(user != null ? user.getId() : null)
                         .name(userName) 
                         .email(userEmail)
                         .portfolioLink(req.getPortfolioLink())

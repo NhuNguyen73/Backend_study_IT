@@ -50,6 +50,7 @@ public class ContributorRequestServiceImpl implements ContributorRequestService 
 
                 return AdminContributorRequestDto.builder()
                     .id(req.getId())
+                    .userId(user != null ? user.getId() : null)
                     .name(user != null ? user.getFullName() : "N/A") 
                     .email(user != null ? user.getEmail() : "N/A")
                     .portfolioLink(req.getPortfolioLink())

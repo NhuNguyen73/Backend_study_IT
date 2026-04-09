@@ -16,6 +16,8 @@ import java.util.UUID;
 @Builder
 public class AdminContributorRequestDto {
     private UUID id;
+    /** Id người dùng (để admin gán role qua /api/admin/users/...). */
+    private UUID userId;
     private String name; // Tên người dùng gửi yêu cầu
     private String email; // Email người dùng gửi yêu cầu
     private String portfolioLink;

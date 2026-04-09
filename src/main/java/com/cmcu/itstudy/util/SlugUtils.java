@@ -9,7 +9,7 @@ public class SlugUtils {
         if (input == null || input.isBlank()) {
             return "default-slug"; // Provide a default slug or handle as an error
         }
-        String s = Normalizer.normalize(input.trim(), Normalizer.Form.NFD).replaceAll("\p{M}+", "");
+        String s = Normalizer.normalize(input.trim(), Normalizer.Form.NFD).replaceAll("\\p{M}+", "");
         s = s.toLowerCase(Locale.ROOT).replaceAll("[^a-z0-9]+", "-").replaceAll("^-+|-+$", "");
         return s.isEmpty() ? "default-slug" : s; // Ensure slug is not empty
     }

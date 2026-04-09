@@ -15,7 +15,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -57,29 +56,27 @@ public class AdminContributorRequestServiceImpl implements AdminContributorReque
         if (newStatus == ContributorRequestStatus.APPROVED) {
             User user = userRepository.findById(request.getUser().getId())
                     .orElseThrow(() -> new RuntimeException("User not found for request"));
+            UUID uid = user.getId();
 
-            Optional<Role> contributorRoleOptional = roleRepository.findByName(RoleEnum.CONTRIBUTOR.name());
-            if (contributorRoleOptional.isPresent()) {
-                Role contributorRole = contributorRoleOptional.get();
-                // Check if the user already has the contributor role
-                boolean hasContributorRole = user.getUserRoles().stream()
-                        .anyMatch(userRole -> userRole.getRole() != null && userRole.getRole().getId().equals(contributorRole.getId()));
-
-                if (!hasContributorRole) {
-                    // Use the builder from UserRole entity
-                    UserRole newUserRole = UserRole.builder()
-                            .userId(user.getId())
-                            .roleId(contributorRole.getId())
-                            .user(user) // Set the user entity
-                            .role(contributorRole) // Set the role entity
-                            .createdAt(LocalDateTime.now())
-                            .build();
-                    
-                    // Save the UserRole
-                    userRoleRepository.save(newUserRole);
+            roleRepository.findByName(RoleEnum.USER.name()).ifPresent(userRole -> {
+                UserRole.UserRoleId userComposite = new UserRole.UserRoleId(uid, userRole.getId());
+                if (userRoleRepository.existsById(userComposite)) {
+                    userRoleRepository.deleteById(userComposite);
                 }
-            } else {
-                throw new RuntimeException("Contributor role not found");
+            });
+
+            Role contributorRole = roleRepository.findByName(RoleEnum.CONTRIBUTOR.name())
+                    .orElseThrow(() -> new RuntimeException("Contributor role not found"));
+            UserRole.UserRoleId contributorComposite = new UserRole.UserRoleId(uid, contributorRole.getId());
+            if (!userRoleRepository.existsById(contributorComposite)) {
+                UserRole newUserRole = UserRole.builder()
+                        .userId(uid)
+                        .roleId(contributorRole.getId())
+                        .user(user)
+                        .role(contributorRole)
+                        .createdAt(LocalDateTime.now())
+                        .build();
+                userRoleRepository.save(newUserRole);
             }
         }
     }
