@@ -1,5 +1,6 @@
 package com.cmcu.itstudy.dto.document;
 
+import com.cmcu.itstudy.enums.DocumentStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -14,16 +15,19 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class DocumentDetailInfoDto {
+public class MyDocumentDetailDto {
+
     private String id;
     private String title;
     private String description;
-    private FileTypeDto documentType;
-    private LocalDateTime createdAt;
-    /** @deprecated Prefer {@link #uploader} / {@link #userId}. */
-    private String authorName;
-    private String userId;
-    private DocumentUploaderDto uploader;
+    private String documentUrl;
+    private String thumbnailUrl;
+    private String fileName;
+    private String fileType;
+    private Long fileSizeBytes;
     private String categoryName;
     private List<String> tags;
+    private DocumentStatus status;
+    private String rejectReason;
+    private LocalDateTime createdAt;
 }

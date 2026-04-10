@@ -7,9 +7,17 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 public interface DocumentViewRepository extends JpaRepository<DocumentView, Long> {
+
+    @Query("""
+            select count(distinct v.document.id)
+            from DocumentView v
+            where v.user is not null and v.user.id = :userId
+            """)
+    long countDistinctDocumentsViewedByUserId(@Param("userId") UUID userId);
 
     long countByDocument(Document document);
 
@@ -28,4 +36,14 @@ public interface DocumentViewRepository extends JpaRepository<DocumentView, Long
               and v.viewedAt >= :from
             """)
     long countRecentViews(@Param("document") Document document, @Param("from") LocalDateTime from);
+
+    @Query(value = """
+            select cast(v.viewed_at as date) as d, count(distinct v.user_id)
+            from tbl_document_views v
+            where v.user_id is not null
+              and v.viewed_at >= :since
+            group by cast(v.viewed_at as date)
+            order by d asc
+            """, nativeQuery = true)
+    List<Object[]> countDistinctUsersByViewDaySince(@Param("since") LocalDateTime since);
 }

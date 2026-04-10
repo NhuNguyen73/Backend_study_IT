@@ -36,6 +36,9 @@ public class DocumentCreateRequestDto {
     @NotBlank(message = "Document URL cannot be empty")
     private String documentUrl;
 
+    @NotBlank(message = "Storage path cannot be empty")
+    private String storagePath;
+
     @NotBlank(message = "Thumbnail URL cannot be empty")
     private String thumbnailUrl;
 

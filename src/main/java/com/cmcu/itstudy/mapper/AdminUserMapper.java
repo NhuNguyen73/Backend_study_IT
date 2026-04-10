@@ -24,7 +24,7 @@ public final class AdminUserMapper {
                 .id(user.getId() != null ? user.getId().toString() : null)
                 .email(user.getEmail())
                 .fullName(user.getFullName())
-                .avatar(user.getAvatar())
+                .avatar(user.getAvatarUrl())
                 .status(user.getStatus())
                 .emailVerified(user.getEmailVerified())
                 .createdAt(user.getCreatedAt())

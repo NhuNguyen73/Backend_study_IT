@@ -93,7 +93,7 @@ public class AdminUserServiceImpl extends BaseAuthService implements AdminUserSe
                 .email(request.getEmail().trim())
                 .password(encodePassword(request.getPassword()))
                 .fullName(request.getFullName() != null ? request.getFullName().trim() : null)
-                .avatar(request.getAvatar())
+                .avatarUrl(request.getAvatar())
                 .status(status)
                 .emailVerified(verified)
                 .createdAt(now)
@@ -131,7 +131,7 @@ public class AdminUserServiceImpl extends BaseAuthService implements AdminUserSe
             user.setFullName(request.getFullName().isBlank() ? null : request.getFullName().trim());
         }
         if (request.getAvatar() != null) {
-            user.setAvatar(request.getAvatar().isBlank() ? null : request.getAvatar().trim());
+            user.setAvatarUrl(request.getAvatar().isBlank() ? null : request.getAvatar().trim());
         }
         if (request.getEmailVerified() != null) {
             user.setEmailVerified(request.getEmailVerified());

@@ -14,6 +14,9 @@ import java.util.UUID;
 @Repository
 public interface ContributorRequestRepository extends JpaRepository<ContributorRequest, UUID> {
     boolean existsByUserAndStatus(User user, ContributorRequestStatus status);
+
+    long countByStatus(ContributorRequestStatus status);
+
     Optional<ContributorRequest> findFirstByUserOrderByCreatedAtDesc(User user);
 
     // Custom query to fetch all ContributorRequests with their associated User and Certificates eagerly

@@ -48,6 +48,10 @@ public class DocumentFile {
     @Column(name = "storage_path", nullable = false, length = 1000)
     private String storagePath;
 
+    /** Supabase public URL (source of truth for download/preview when set). */
+    @Column(name = "file_url", length = 2000)
+    private String fileUrl;
+
     @Column(name = "original_file_name", nullable = false, length = 500)
     private String originalFileName;
 

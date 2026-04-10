@@ -4,6 +4,7 @@ import com.cmcu.itstudy.dto.common.ApiResponse;
 import com.cmcu.itstudy.dto.document.DocumentCardDto;
 import com.cmcu.itstudy.dto.document.DocumentCreateRequestDto;
 import com.cmcu.itstudy.dto.document.DocumentUpdateRequestDto;
+import com.cmcu.itstudy.dto.document.MyDocumentDetailDto;
 import com.cmcu.itstudy.entity.User;
 import com.cmcu.itstudy.security.UserDetailsImpl;
 import com.cmcu.itstudy.service.contract.DocumentService;
@@ -32,6 +33,15 @@ public class MyDocumentController {
         User user = currentUser.getUser();
         List<DocumentCardDto> myDocuments = documentService.getMyDocuments(user);
         return ResponseEntity.ok(ApiResponse.success(myDocuments, "List of my documents"));
+    }
+
+    @GetMapping("/{documentId}")
+    public ResponseEntity<ApiResponse<MyDocumentDetailDto>> getMyDocumentDetail(
+            @PathVariable UUID documentId,
+            @AuthenticationPrincipal UserDetailsImpl currentUser) {
+        User user = currentUser.getUser();
+        MyDocumentDetailDto data = documentService.getMyDocumentDetail(documentId, user);
+        return ResponseEntity.ok(ApiResponse.success(data, "My document detail"));
     }
 
     @PostMapping

@@ -44,8 +44,14 @@ public class User {
     @Column(name = "full_name", length = 255)
     private String fullName;
 
+    @Column(name = "phone", length = 32)
+    private String phone;
+
+    @Column(name = "bio", length = 2000)
+    private String bio;
+
     @Column(name = "avatar", length = 2048)
-    private String avatar;
+    private String avatarUrl;
 
     @Column(name = "provider", length = 32)
     private String provider;

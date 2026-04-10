@@ -38,6 +38,9 @@ public class DocumentUpdateRequestDto {
     @NotBlank(message = "Document URL cannot be empty")
     private String documentUrl;
 
+    /** Supabase object path; optional when only metadata changes (keep existing primary file path). */
+    private String storagePath;
+
     @NotBlank(message = "Thumbnail URL cannot be empty")
     private String thumbnailUrl;
 

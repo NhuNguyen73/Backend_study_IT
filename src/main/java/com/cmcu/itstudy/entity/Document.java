@@ -87,6 +87,9 @@ public class Document {
     @Column(name = "status", nullable = false, length = 20)
     private DocumentStatus status;
 
+    @Column(name = "reject_reason", columnDefinition = "nvarchar(max)")
+    private String rejectReason;
+
     @Column(name = "is_deleted", nullable = false)
     private Boolean deleted = Boolean.FALSE;
 

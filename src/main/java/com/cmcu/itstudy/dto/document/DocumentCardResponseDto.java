@@ -19,7 +19,11 @@ public class DocumentCardResponseDto {
     private String title;
     private String thumbnail;
     private String categoryName;
+    /** @deprecated Prefer {@link #uploader} / {@link #userId}; kept for API compatibility (same value as uploader full name). */
     private String authorName;
+    /** Uploader user id (document.created_by). */
+    private String userId;
+    private DocumentUploaderDto uploader;
     private LocalDateTime createdAt;
     private Integer viewCount;
     private Integer downloadCount;

@@ -1,6 +1,7 @@
 package com.cmcu.itstudy.service.impl;
 
 import com.cmcu.itstudy.dto.document.DocumentCardResponseDto;
+import com.cmcu.itstudy.dto.document.DocumentUploaderDto;
 import com.cmcu.itstudy.dto.document.DocumentDetailQuizDto;
 import com.cmcu.itstudy.dto.document.DocumentDetailResponseDto;
 import com.cmcu.itstudy.dto.document.DocumentFileUrlResponseDto;
@@ -9,9 +10,7 @@ import com.cmcu.itstudy.dto.document.DocumentRelatedDocumentDto;
 import com.cmcu.itstudy.dto.document.QuizListPageResponseDto;
 import com.cmcu.itstudy.entity.Document;
 import com.cmcu.itstudy.mapper.DocumentMapper;
-import com.cmcu.itstudy.repository.DocumentDownloadRepository;
 import com.cmcu.itstudy.repository.DocumentFileRepository;
-import com.cmcu.itstudy.repository.DocumentViewRepository;
 import com.cmcu.itstudy.service.contract.CommentService;
 import com.cmcu.itstudy.service.contract.DocumentQueryService;
 import com.cmcu.itstudy.service.contract.DocumentService;
@@ -34,23 +33,17 @@ public class DocumentQueryServiceImpl implements DocumentQueryService {
     private final CommentService commentService;
     private final QuizService quizService;
     private final DocumentFileRepository documentFileRepository;
-    private final DocumentViewRepository documentViewRepository;
-    private final DocumentDownloadRepository documentDownloadRepository;
     private final DocumentCardEnrichmentService documentCardEnrichmentService;
 
     public DocumentQueryServiceImpl(DocumentService documentService,
                                     CommentService commentService,
                                     QuizService quizService,
                                     DocumentFileRepository documentFileRepository,
-                                    DocumentViewRepository documentViewRepository,
-                                    DocumentDownloadRepository documentDownloadRepository,
                                     DocumentCardEnrichmentService documentCardEnrichmentService) {
         this.documentService = documentService;
         this.commentService = commentService;
         this.quizService = quizService;
         this.documentFileRepository = documentFileRepository;
-        this.documentViewRepository = documentViewRepository;
-        this.documentDownloadRepository = documentDownloadRepository;
         this.documentCardEnrichmentService = documentCardEnrichmentService;
     }
 
@@ -60,11 +53,12 @@ public class DocumentQueryServiceImpl implements DocumentQueryService {
         Document document = documentService.getById(id);
 
         DocumentPrimaryFileDto primaryFile = documentFileRepository.findByDocumentIdAndPrimaryTrue(id)
-                .map(DocumentMapper::toPrimaryFileDto)
-                .orElse(null);
+                .map(f -> DocumentMapper.toPrimaryFileDto(f, document))
+                .orElseGet(() -> DocumentMapper.legacyPrimaryFromDocument(document));
 
-        long totalViews = documentViewRepository.countByDocumentId(id);
-        long totalDownloads = documentDownloadRepository.countByDocumentId(id);
+        // Same source as list/home cards: denormalized counters on Document (updated by increaseView / downloadDocument).
+        long totalViews = document.getViewCount() != null ? document.getViewCount() : 0L;
+        long totalDownloads = document.getDownloadCount() != null ? document.getDownloadCount() : 0L;
 
         var comments = commentService.loadCommentsForDocument(id);
         List<DocumentDetailQuizDto> quizzes = quizService.loadQuizzesForDocument(id);
@@ -75,15 +69,20 @@ public class DocumentQueryServiceImpl implements DocumentQueryService {
 
         List<DocumentCardResponseDto> cards = documentCardEnrichmentService
                 .toEnrichedCardDtos(List.of(document), currentUserId);
-        String authorName = cards.isEmpty() ? null : cards.get(0).getAuthorName();
+        DocumentCardResponseDto card0 = cards.isEmpty() ? null : cards.get(0);
+        String authorName = card0 != null ? card0.getAuthorName() : null;
+        String uploaderUserId = card0 != null ? card0.getUserId() : null;
+        DocumentUploaderDto uploader = card0 != null ? card0.getUploader() : null;
         List<String> tags = Collections.emptyList();
-        if (!cards.isEmpty() && cards.get(0).getTags() != null) {
-            tags = cards.get(0).getTags();
+        if (card0 != null && card0.getTags() != null) {
+            tags = card0.getTags();
         }
 
         return DocumentMapper.toDetailResponseDto(
                 document,
                 authorName,
+                uploaderUserId,
+                uploader,
                 tags,
                 totalViews,
                 totalDownloads,
@@ -97,11 +96,15 @@ public class DocumentQueryServiceImpl implements DocumentQueryService {
     @Transactional(readOnly = true)
     @Override
     public DocumentFileUrlResponseDto getDocumentPrimaryFileUrl(UUID documentId) {
-        documentService.getById(documentId);
+        Document document = documentService.getById(documentId);
 
-        return documentFileRepository.findByDocumentIdAndPrimaryTrue(documentId)
-                .map(DocumentMapper::toFileUrlResponseDto)
-                .orElseThrow(() -> new NoSuchElementException("Primary document file not found"));
+        DocumentFileUrlResponseDto dto = documentFileRepository.findByDocumentIdAndPrimaryTrue(documentId)
+                .map(f -> DocumentMapper.toFileUrlResponseDto(f, document))
+                .orElseGet(() -> DocumentMapper.toFileUrlResponseDto(null, document));
+        if (dto == null || dto.getFileUrl() == null || dto.getFileUrl().isBlank()) {
+            throw new NoSuchElementException("Primary document file not found");
+        }
+        return dto;
     }
 
     @Transactional(readOnly = true)

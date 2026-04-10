@@ -13,9 +13,18 @@ import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Collection;
+import java.util.Optional;
 import java.util.UUID;
 
 public interface DocumentRepository extends JpaRepository<Document, UUID>, JpaSpecificationExecutor<Document> {
+
+    @EntityGraph(attributePaths = {"category", "createdBy"})
+    Optional<Document> findByIdAndDeletedFalse(UUID id);
+
+    @EntityGraph(attributePaths = {"category", "createdBy"})
+    @Query("select d from Document d where d.status = :status and d.deleted = false order by d.createdAt desc")
+    Page<Document> findPendingPageWithCategoryAndCreator(@Param("status") DocumentStatus status, Pageable pageable);
 
     Page<Document> findByStatusAndDeletedFalseOrderByCreatedAtDesc(DocumentStatus status, Pageable pageable);
 
@@ -26,6 +35,14 @@ public interface DocumentRepository extends JpaRepository<Document, UUID>, JpaSp
     Page<Document> findByStatusOrderByViewCountDescDownloadCountDescCreatedAtDesc(DocumentStatus status, Pageable pageable);
 
     long countByStatusAndDeletedFalse(DocumentStatus status);
+
+    long countByDeletedFalse();
+
+    @Query("""
+            select count(d) from Document d
+            where d.deleted = false and d.createdAt >= :from and d.createdAt < :to
+            """)
+    long countCreatedBetweenNotDeleted(@Param("from") LocalDateTime from, @Param("to") LocalDateTime to);
 
     long countByStatusAndDeletedFalseAndCreatedByIsNotNull(DocumentStatus status);
 
@@ -134,4 +151,7 @@ public interface DocumentRepository extends JpaRepository<Document, UUID>, JpaSp
 
     @EntityGraph(attributePaths = {"category", "createdBy", "documentTags.tag"})
     List<Document> findByCreatedByAndDeletedFalseOrderByCreatedAtDesc(com.cmcu.itstudy.entity.User createdBy);
+
+    @Query("select d.id, u.id, u.fullName from Document d left join d.createdBy u where d.id in :ids")
+    List<Object[]> findUploaderByDocumentIds(@Param("ids") Collection<UUID> ids);
 }

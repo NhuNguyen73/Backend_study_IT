@@ -15,7 +15,7 @@ public final class CommentMapper {
             return null;
         }
         String authorName = comment.getAuthor() != null ? comment.getAuthor().getFullName() : null;
-        String authorAvatar = comment.getAuthor() != null ? comment.getAuthor().getAvatar() : null;
+        String authorAvatar = comment.getAuthor() != null ? comment.getAuthor().getAvatarUrl() : null;
         String replyToUserName = comment.getReplyToUser() != null ? comment.getReplyToUser().getFullName() : null;
         return CommentResponse.builder()
                 .id(uuidToString(comment.getId()))

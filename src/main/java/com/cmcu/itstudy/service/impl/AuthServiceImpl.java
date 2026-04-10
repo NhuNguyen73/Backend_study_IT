@@ -371,7 +371,7 @@ public class AuthServiceImpl extends BaseAuthService implements AuthService {
                     .email(email)
                     .password(encodePassword("OAUTH2_USER_" + UUID.randomUUID()))
                     .fullName(fullName)
-                    .avatar(resolvedAvatar)
+                    .avatarUrl(resolvedAvatar)
                     .provider(resolvedProvider)
                     .providerId(resolvedProviderId)
                     .status("ACTIVE")
@@ -400,8 +400,8 @@ public class AuthServiceImpl extends BaseAuthService implements AuthService {
                 user.setFullName(resolvedName);
                 changed = true;
             }
-            if ((user.getAvatar() == null || user.getAvatar().isBlank()) && resolvedAvatar != null) {
-                user.setAvatar(resolvedAvatar);
+            if ((user.getAvatarUrl() == null || user.getAvatarUrl().isBlank()) && resolvedAvatar != null) {
+                user.setAvatarUrl(resolvedAvatar);
                 changed = true;
             }
             if (changed) {

@@ -1,21 +1,20 @@
 package com.cmcu.itstudy.service.impl;
 
 import com.cmcu.itstudy.dto.document.DocumentCardResponseDto;
-import com.cmcu.itstudy.entity.Author;
+import com.cmcu.itstudy.dto.document.DocumentUploaderDto;
 import com.cmcu.itstudy.entity.Document;
-import com.cmcu.itstudy.entity.DocumentAuthor;
 import com.cmcu.itstudy.entity.DocumentBookmark;
 import com.cmcu.itstudy.entity.DocumentTag;
 import com.cmcu.itstudy.entity.Tag;
 import com.cmcu.itstudy.entity.User;
 import com.cmcu.itstudy.mapper.DocumentMapper;
-import com.cmcu.itstudy.repository.AuthorRepository;
-import com.cmcu.itstudy.repository.DocumentAuthorRepository;
 import com.cmcu.itstudy.repository.DocumentBookmarkRepository;
+import com.cmcu.itstudy.repository.DocumentRepository;
 import com.cmcu.itstudy.repository.DocumentTagRepository;
 import com.cmcu.itstudy.repository.TagRepository;
 import com.cmcu.itstudy.repository.UserRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.util.*;
 import java.util.function.Function;
@@ -24,25 +23,22 @@ import java.util.stream.Collectors;
 @Service
 public class DocumentCardEnrichmentService {
 
-    private final AuthorRepository authorRepository;
     private final TagRepository tagRepository;
-    private final DocumentAuthorRepository documentAuthorRepository;
     private final DocumentTagRepository documentTagRepository;
     private final DocumentBookmarkRepository documentBookmarkRepository;
     private final UserRepository userRepository;
+    private final DocumentRepository documentRepository;
 
-    public DocumentCardEnrichmentService(AuthorRepository authorRepository,
-                                         TagRepository tagRepository,
-                                         DocumentAuthorRepository documentAuthorRepository,
+    public DocumentCardEnrichmentService(TagRepository tagRepository,
                                          DocumentTagRepository documentTagRepository,
                                          DocumentBookmarkRepository documentBookmarkRepository,
-                                         UserRepository userRepository) {
-        this.authorRepository = authorRepository;
+                                         UserRepository userRepository,
+                                         DocumentRepository documentRepository) {
         this.tagRepository = tagRepository;
-        this.documentAuthorRepository = documentAuthorRepository;
         this.documentTagRepository = documentTagRepository;
         this.documentBookmarkRepository = documentBookmarkRepository;
         this.userRepository = userRepository;
+        this.documentRepository = documentRepository;
     }
 
     public List<DocumentCardResponseDto> toEnrichedCardDtos(List<Document> documents, UUID currentUserId) {
@@ -50,17 +46,17 @@ public class DocumentCardEnrichmentService {
             return Collections.emptyList();
         }
 
-        Map<UUID, String> authorNames = loadAuthorNames(documents);
+        Map<UUID, DocumentUploaderDto> uploaders = loadUploaders(documents);
         Map<UUID, List<String>> tagsByDocument = loadTagNames(documents);
         Set<UUID> bookmarkedDocumentIds = loadBookmarkedDocumentIds(documents, currentUserId);
 
         return documents.stream()
                 .map(DocumentMapper::toCardDto)
-                .peek(dto -> enrichCardDto(dto, authorNames, tagsByDocument, bookmarkedDocumentIds))
+                .peek(dto -> enrichCardDto(dto, uploaders, tagsByDocument, bookmarkedDocumentIds))
                 .collect(Collectors.toList());
     }
 
-    private Map<UUID, String> loadAuthorNames(List<Document> documents) {
+    private Map<UUID, DocumentUploaderDto> loadUploaders(List<Document> documents) {
         Set<UUID> documentIds = documents.stream()
                 .map(Document::getId)
                 .filter(Objects::nonNull)
@@ -69,23 +65,22 @@ public class DocumentCardEnrichmentService {
             return Collections.emptyMap();
         }
 
-        List<DocumentAuthor> documentAuthors = documentAuthorRepository.findByDocumentIdIn(documentIds);
-        Set<UUID> authorIds = documentAuthors.stream()
-                .map(DocumentAuthor::getAuthorId)
-                .filter(Objects::nonNull)
-                .collect(Collectors.toSet());
-
-        Map<UUID, Author> authorsById = authorRepository.findAllById(authorIds).stream()
-                .collect(Collectors.toMap(Author::getId, Function.identity()));
-
-        Map<UUID, String> result = new HashMap<>();
-        for (DocumentAuthor da : documentAuthors) {
-            UUID docId = da.getDocumentId();
-            UUID authorId = da.getAuthorId();
-            Author author = authorsById.get(authorId);
-            if (docId != null && author != null && !result.containsKey(docId)) {
-                result.put(docId, author.getName());
+        List<Object[]> rows = documentRepository.findUploaderByDocumentIds(documentIds);
+        Map<UUID, DocumentUploaderDto> result = new HashMap<>();
+        for (Object[] row : rows) {
+            if (row == null || row.length < 1 || row[0] == null) {
+                continue;
             }
+            UUID docId = (UUID) row[0];
+            UUID userId = row.length > 1 ? (UUID) row[1] : null;
+            String fullName = row.length > 2 && row[2] != null ? row[2].toString() : null;
+            if (userId == null) {
+                continue;
+            }
+            result.put(docId, DocumentUploaderDto.builder()
+                    .id(userId.toString())
+                    .fullName(StringUtils.hasText(fullName) ? fullName : null)
+                    .build());
         }
         return result;
     }
@@ -138,16 +133,24 @@ public class DocumentCardEnrichmentService {
     }
 
     private void enrichCardDto(DocumentCardResponseDto dto,
-                               Map<UUID, String> authorNames,
+                               Map<UUID, DocumentUploaderDto> uploaders,
                                Map<UUID, List<String>> tagsByDocument,
                                Set<UUID> bookmarkedDocumentIds) {
         if (dto == null || dto.getId() == null) {
             return;
         }
         UUID documentId = UUID.fromString(dto.getId());
-        dto.setAuthorName(authorNames.get(documentId));
+        DocumentUploaderDto uploader = uploaders.get(documentId);
+        if (uploader != null) {
+            dto.setUploader(uploader);
+            dto.setUserId(uploader.getId());
+            dto.setAuthorName(uploader.getFullName());
+        } else {
+            dto.setUploader(null);
+            dto.setUserId(null);
+            dto.setAuthorName(null);
+        }
         dto.setTags(tagsByDocument.getOrDefault(documentId, Collections.emptyList()));
         dto.setIsBookmarked(bookmarkedDocumentIds.contains(documentId));
     }
 }
-

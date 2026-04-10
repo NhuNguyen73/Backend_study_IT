@@ -3,6 +3,7 @@ package com.cmcu.itstudy.service.impl;
 import com.cmcu.itstudy.dto.document.DocumentCardDto;
 import com.cmcu.itstudy.dto.document.DocumentCreateRequestDto;
 import com.cmcu.itstudy.dto.document.DocumentUpdateRequestDto;
+import com.cmcu.itstudy.dto.document.MyDocumentDetailDto;
 import com.cmcu.itstudy.entity.*;
 import com.cmcu.itstudy.enums.DocumentStatus;
 import com.cmcu.itstudy.enums.FileType;
@@ -11,14 +12,18 @@ import com.cmcu.itstudy.service.contract.DocumentService;
 import com.cmcu.itstudy.util.SlugUtils;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Slice;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.NoSuchElementException;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -30,15 +35,18 @@ public class DocumentServiceImpl implements DocumentService {
     private final DocumentTagRepository documentTagRepository;
     private final CategoryRepository categoryRepository;
     private final TagRepository tagRepository;
+    private final DocumentFileRepository documentFileRepository;
 
     public DocumentServiceImpl(DocumentRepository documentRepository,
                                DocumentTagRepository documentTagRepository,
                                CategoryRepository categoryRepository,
-                               TagRepository tagRepository) {
+                               TagRepository tagRepository,
+                               DocumentFileRepository documentFileRepository) {
         this.documentRepository = documentRepository;
         this.documentTagRepository = documentTagRepository;
         this.categoryRepository = categoryRepository;
         this.tagRepository = tagRepository;
+        this.documentFileRepository = documentFileRepository;
     }
 
     @Transactional(readOnly = true)
@@ -136,9 +144,15 @@ public class DocumentServiceImpl implements DocumentService {
         // For safety, we can explicitly save them if cascade is not set up correctly.
         documentTagRepository.saveAll(documentTags);
 
+        DocumentFile primaryFile = documentFileRepository.save(buildPrimaryDocumentFile(
+                savedDocument,
+                documentCreateRequestDto.getStoragePath(),
+                documentCreateRequestDto.getDocumentUrl(),
+                documentCreateRequestDto.getFileName(),
+                documentCreateRequestDto.getFileSizeBytes()
+        ));
 
-        // 5. Map to DocumentCardDto for response
-        return mapToDocumentCardDto(savedDocument, currentUser);
+        return mapToDocumentCardDto(savedDocument, currentUser, primaryFile);
     }
 
     @Override
@@ -222,8 +236,12 @@ public class DocumentServiceImpl implements DocumentService {
         // 4. Save updated document
         Document updatedDocument = documentRepository.save(existingDocument);
 
-        // 5. Map to DocumentCardDto for response
-        return mapToDocumentCardDto(updatedDocument, currentUser);
+        syncPrimaryDocumentFile(updatedDocument, documentUpdateRequestDto);
+
+        DocumentFile primaryFile = documentFileRepository.findByDocumentIdAndPrimaryTrue(updatedDocument.getId())
+                .orElse(null);
+
+        return mapToDocumentCardDto(updatedDocument, currentUser, primaryFile);
     }
 
     @Override
@@ -251,12 +269,70 @@ public class DocumentServiceImpl implements DocumentService {
 
         // Map to card DTO for consistency with service contract
         return documents.stream()
-                .map(doc -> mapToDocumentCardDto(doc, currentUser))
+                .map(doc -> mapToDocumentCardDto(
+                        doc,
+                        currentUser,
+                        documentFileRepository.findByDocumentIdAndPrimaryTrue(doc.getId()).orElse(null)))
                 .collect(Collectors.toList());
     }
 
-    // Helper method to map Document entity to DocumentCardDto
-    private DocumentCardDto mapToDocumentCardDto(Document document, User currentUser) {
+    @Override
+    @Transactional(readOnly = true)
+    public MyDocumentDetailDto getMyDocumentDetail(UUID documentId, User currentUser) {
+        Document document = getById(documentId);
+        if (Boolean.TRUE.equals(document.getDeleted())) {
+            throw new NoSuchElementException("Document not found: " + documentId);
+        }
+        if (document.getCreatedBy() == null || !document.getCreatedBy().getId().equals(currentUser.getId())) {
+            throw new AccessDeniedException("You do not have access to this document");
+        }
+        List<String> tagNames = documentTagRepository.findByDocumentId(documentId).stream()
+                .map(DocumentTag::getTag)
+                .filter(Objects::nonNull)
+                .map(Tag::getName)
+                .filter(StringUtils::hasText)
+                .collect(Collectors.toList());
+        String documentUrl = resolveOwnerPreviewUrl(document);
+        return MyDocumentDetailDto.builder()
+                .id(document.getId().toString())
+                .title(document.getTitle())
+                .description(document.getDescription())
+                .documentUrl(documentUrl)
+                .thumbnailUrl(document.getThumbnailUrl())
+                .fileName(document.getFileName())
+                .fileType(document.getFileType() != null ? document.getFileType().name() : null)
+                .fileSizeBytes(document.getFileSize())
+                .categoryName(document.getCategory() != null ? document.getCategory().getName() : null)
+                .tags(tagNames)
+                .status(document.getStatus())
+                .rejectReason(document.getRejectReason())
+                .createdAt(document.getCreatedAt())
+                .build();
+    }
+
+    private String resolveOwnerPreviewUrl(Document document) {
+        Optional<DocumentFile> opt = documentFileRepository.findByDocumentIdAndPrimaryTrue(document.getId());
+        if (opt.isPresent()) {
+            DocumentFile f = opt.get();
+            if (StringUtils.hasText(f.getFileUrl()) && isHttpUrl(f.getFileUrl())) {
+                return f.getFileUrl().trim();
+            }
+            if (StringUtils.hasText(f.getStoragePath()) && isHttpUrl(f.getStoragePath())) {
+                return f.getStoragePath().trim();
+            }
+        }
+        return StringUtils.hasText(document.getFileUrl()) ? document.getFileUrl().trim() : null;
+    }
+
+    private static boolean isHttpUrl(String value) {
+        if (value == null || value.isBlank()) {
+            return false;
+        }
+        String v = value.trim().toLowerCase();
+        return v.startsWith("https://") || v.startsWith("http://");
+    }
+
+    private DocumentCardDto mapToDocumentCardDto(Document document, User currentUser, DocumentFile primaryFile) {
         return DocumentCardDto.builder()
                 .id(document.getId().toString())
                 .title(document.getTitle())
@@ -264,14 +340,71 @@ public class DocumentServiceImpl implements DocumentService {
                 .description(document.getDescription())
                 .thumbnailUrl(document.getThumbnailUrl())
                 .fileName(document.getFileName())
-                .fileType(document.getFileType() != null ? document.getFileType().name() : "OTHER") // Use enum name
+                .fileType(document.getFileType() != null ? document.getFileType().name() : "OTHER")
                 .fileSize(document.getFileSize())
                 .status(document.getStatus())
-                .uploadDate(document.getCreatedAt()) // Using createdAt as uploadDate
+                .uploadDate(document.getCreatedAt())
                 .views(document.getViewCount())
                 .downloads(document.getDownloadCount())
                 .bookmarks(document.getBookmarkCount())
+                .categoryName(document.getCategory() != null ? document.getCategory().getName() : null)
+                .authorName(currentUser != null ? currentUser.getFullName() : null)
+                .documentUrl(document.getFileUrl())
+                .storagePath(primaryFile != null ? primaryFile.getStoragePath() : null)
                 .build();
+    }
+
+    private static String extractFileExtension(String fileName) {
+        if (!StringUtils.hasText(fileName)) {
+            return "dat";
+        }
+        int i = fileName.lastIndexOf('.');
+        if (i < 0 || i == fileName.length() - 1) {
+            return "dat";
+        }
+        return fileName.substring(i + 1).toLowerCase();
+    }
+
+    private DocumentFile buildPrimaryDocumentFile(
+            Document document,
+            String storagePath,
+            String fileUrl,
+            String originalFileName,
+            Long sizeBytes
+    ) {
+        return DocumentFile.builder()
+                .document(document)
+                .storagePath(storagePath.trim())
+                .fileUrl(fileUrl)
+                .originalFileName(originalFileName)
+                .fileExtension(extractFileExtension(originalFileName))
+                .sizeBytes(sizeBytes != null ? sizeBytes : 0L)
+                .primary(true)
+                .build();
+    }
+
+    private void syncPrimaryDocumentFile(Document document, DocumentUpdateRequestDto dto) {
+        Optional<DocumentFile> existing = documentFileRepository.findByDocumentIdAndPrimaryTrue(document.getId());
+        if (existing.isPresent()) {
+            DocumentFile df = existing.get();
+            df.setFileUrl(dto.getDocumentUrl());
+            df.setOriginalFileName(dto.getFileName());
+            df.setFileExtension(extractFileExtension(dto.getFileName()));
+            df.setSizeBytes(dto.getFileSizeBytes() != null ? dto.getFileSizeBytes() : 0L);
+            if (StringUtils.hasText(dto.getStoragePath())) {
+                df.setStoragePath(dto.getStoragePath().trim());
+            }
+            documentFileRepository.save(df);
+            return;
+        }
+        if (StringUtils.hasText(dto.getStoragePath())) {
+            documentFileRepository.save(buildPrimaryDocumentFile(
+                    document,
+                    dto.getStoragePath().trim(),
+                    dto.getDocumentUrl(),
+                    dto.getFileName(),
+                    dto.getFileSizeBytes()));
+        }
     }
 
 }

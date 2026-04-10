@@ -52,6 +52,35 @@ public interface QuizAttemptRepository extends JpaRepository<QuizAttempt, UUID> 
             """)
     Double averageSubmittedScore(@Param("userId") UUID userId);
 
+    @Query("""
+            select avg(qa.score)
+            from QuizAttempt qa
+            where qa.userId = :userId
+              and upper(qa.status) in ('PASSED', 'FAILED')
+              and qa.score is not null
+              and qa.endTime is not null
+              and qa.endTime >= :fromInclusive
+              and qa.endTime < :toExclusive
+            """)
+    Double averageSubmittedScoreBetween(
+            @Param("userId") UUID userId,
+            @Param("fromInclusive") LocalDateTime fromInclusive,
+            @Param("toExclusive") LocalDateTime toExclusive
+    );
+
+    @Query(value = """
+            select cast(qa.end_time as date) as dt, avg(cast(qa.score as float))
+            from tbl_quiz_attempts qa
+            where qa.user_id = :userId
+              and upper(qa.status) in ('PASSED', 'FAILED')
+              and qa.end_time is not null
+              and qa.score is not null
+              and qa.end_time >= :since
+            group by cast(qa.end_time as date)
+            order by dt asc
+            """, nativeQuery = true)
+    List<Object[]> findDailyAverageScoresSince(@Param("userId") UUID userId, @Param("since") LocalDateTime since);
+
     @Query(value = """
             select coalesce(sum(datediff(second, qa.start_time, qa.end_time)), 0)
             from tbl_quiz_attempts qa

@@ -8,6 +8,7 @@ import com.cmcu.itstudy.dto.document.DocumentDetailQuizDto;
 import com.cmcu.itstudy.dto.document.DocumentDetailResponseDto;
 import com.cmcu.itstudy.dto.document.DocumentDetailStatsDto;
 import com.cmcu.itstudy.dto.document.DocumentFileUrlResponseDto;
+import com.cmcu.itstudy.dto.document.DocumentUploaderDto;
 import com.cmcu.itstudy.dto.document.DocumentPrimaryFileDto;
 import com.cmcu.itstudy.dto.document.DocumentRelatedDocumentDto;
 import com.cmcu.itstudy.dto.document.FileTypeDto;
@@ -20,6 +21,7 @@ import com.cmcu.itstudy.entity.DocumentQuiz;
 import com.cmcu.itstudy.entity.Quiz;
 import com.cmcu.itstudy.enums.FileType;
 import org.springframework.data.domain.Page;
+import org.springframework.util.StringUtils;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -54,6 +56,8 @@ public final class DocumentMapper {
 
     public static DocumentDetailResponseDto toDetailResponseDto(Document document,
                                                                   String authorName,
+                                                                  String uploaderUserId,
+                                                                  DocumentUploaderDto uploader,
                                                                   List<String> tags,
                                                                   long totalViews,
                                                                   long totalDownloads,
@@ -65,7 +69,7 @@ public final class DocumentMapper {
             return null;
         }
 
-        DocumentDetailInfoDto documentInfo = toDocumentDetailInfoDto(document, authorName, tags);
+        DocumentDetailInfoDto documentInfo = toDocumentDetailInfoDto(document, authorName, uploaderUserId, uploader, tags);
         DocumentDetailStatsDto stats = DocumentDetailStatsDto.builder()
                 .totalViews(totalViews)
                 .totalDownloads(totalDownloads)
@@ -81,7 +85,11 @@ public final class DocumentMapper {
                 .build();
     }
 
-    public static DocumentDetailInfoDto toDocumentDetailInfoDto(Document document, String authorName, List<String> tags) {
+    public static DocumentDetailInfoDto toDocumentDetailInfoDto(Document document,
+                                                                 String authorName,
+                                                                 String uploaderUserId,
+                                                                 DocumentUploaderDto uploader,
+                                                                 List<String> tags) {
         if (document == null) {
             return null;
         }
@@ -92,29 +100,69 @@ public final class DocumentMapper {
                 .documentType(map(document.getFileType()))
                 .createdAt(document.getCreatedAt())
                 .authorName(authorName)
+                .userId(uploaderUserId)
+                .uploader(uploader)
                 .categoryName(document.getCategory() != null ? document.getCategory().getName() : null)
                 .tags(tags != null ? tags : Collections.emptyList())
                 .build();
     }
 
-    public static DocumentPrimaryFileDto toPrimaryFileDto(DocumentFile file) {
+    /**
+     * Primary file for detail/preview: prefer {@link DocumentFile#getFileUrl()}, then {@link Document#getFileUrl()},
+     * then storage path (legacy rows).
+     */
+    public static DocumentPrimaryFileDto toPrimaryFileDto(DocumentFile file, Document document) {
         if (file == null) {
-            return null;
+            return legacyPrimaryFromDocument(document);
         }
+        String fileUrl = firstNonBlank(
+                file.getFileUrl(),
+                document != null ? document.getFileUrl() : null,
+                file.getStoragePath()
+        );
+        Long size = file.getSizeBytes() != null ? file.getSizeBytes() : (document != null ? document.getFileSize() : null);
+        String ft = StringUtils.hasText(file.getFileExtension())
+                ? file.getFileExtension()
+                : (document != null && document.getFileType() != null ? document.getFileType().name() : null);
         return DocumentPrimaryFileDto.builder()
-                .fileUrl(file.getStoragePath())
-                .fileType(file.getFileExtension())
-                .fileSize(file.getSizeBytes())
+                .fileUrl(fileUrl)
+                .fileType(ft)
+                .fileSize(size)
                 .build();
     }
 
-    public static DocumentFileUrlResponseDto toFileUrlResponseDto(DocumentFile file) {
-        if (file == null) {
+    public static DocumentPrimaryFileDto legacyPrimaryFromDocument(Document document) {
+        if (document == null || !StringUtils.hasText(document.getFileUrl())) {
             return null;
         }
-        return DocumentFileUrlResponseDto.builder()
-                .fileUrl(file.getStoragePath())
+        return DocumentPrimaryFileDto.builder()
+                .fileUrl(document.getFileUrl())
+                .fileType(document.getFileType() != null ? document.getFileType().name() : null)
+                .fileSize(document.getFileSize())
                 .build();
+    }
+
+    public static DocumentFileUrlResponseDto toFileUrlResponseDto(DocumentFile file, Document document) {
+        if (file == null) {
+            if (document == null || !StringUtils.hasText(document.getFileUrl())) {
+                return null;
+            }
+            return DocumentFileUrlResponseDto.builder().fileUrl(document.getFileUrl()).build();
+        }
+        String url = firstNonBlank(file.getFileUrl(), document.getFileUrl(), file.getStoragePath());
+        return DocumentFileUrlResponseDto.builder().fileUrl(url).build();
+    }
+
+    private static String firstNonBlank(String... values) {
+        if (values == null) {
+            return null;
+        }
+        for (String v : values) {
+            if (StringUtils.hasText(v)) {
+                return v;
+            }
+        }
+        return null;
     }
 
     public static DocumentDetailCommentItemDto toCommentItemDto(DocumentComment comment) {

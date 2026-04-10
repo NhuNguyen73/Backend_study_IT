@@ -37,4 +37,6 @@ public class DocumentCardDto {
     private String authorName;
     private List<String> tags;
     private String documentUrl;
+    /** Primary file storage path (Supabase object key) when a DocumentFile row exists. */
+    private String storagePath;
 }
